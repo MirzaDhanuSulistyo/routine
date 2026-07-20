@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:andura_ui/andura_ui.dart';
 import 'data/routine_repository.dart';
 import 'data/briefing_service.dart';
+import 'data/anomaly_engine.dart';
 
 void main() {
   runApp(const RoutineApp());
@@ -36,6 +37,7 @@ class _RoutineAppState extends State<RoutineApp> {
         themeMode: _themeMode,
         onToggleTheme: _toggleTheme,
         onItemsLoaded: widget.onItemsLoaded,
+        initialIndex: 0,
       ),
     );
   }
@@ -81,12 +83,14 @@ class MainNavigationScreen extends StatefulWidget {
   final ThemeMode themeMode;
   final VoidCallback onToggleTheme;
   final ValueChanged<List<RoutineItem>>? onItemsLoaded;
+  final int initialIndex;
 
   const MainNavigationScreen({
     super.key,
     required this.themeMode,
     required this.onToggleTheme,
     this.onItemsLoaded,
+    this.initialIndex = 0,
   });
 
   @override
@@ -94,10 +98,11 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex = widget.initialIndex;
   final String _currentDate = 'Monday, Jul 20, 2026';
   final RoutineRepository _repository = RoutineRepository();
   final BriefingService _briefingService = BriefingService();
+  final AnomalyAnalyticsEngine _anomalyEngine = AnomalyAnalyticsEngine();
 
   List<RoutineItem> _items = [];
   bool _isLoading = true;
@@ -671,6 +676,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Widget _buildPatternReportView() {
+    final report = _anomalyEngine.analyze(_items);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -689,7 +696,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Understand Layer: Periodic sliding 7-day rule engine detecting timing shifts, repeated notes, and candidate correlations.',
+                    report.primaryAnomalyDescription,
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13),
                   ),
                 ),
@@ -699,11 +706,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              _buildStatCard('7-Day Rate', '84%', '+4% vs last week'),
+              _buildStatCard('Tracked Items', '${report.totalEvents}', 'Active routine logs'),
               const SizedBox(width: 10),
-              _buildStatCard('Tracked', '42', 'Work, Family, Home'),
+              _buildStatCard('Anomalies', '${report.anomaliesDetected}', 'Timing shifts'),
               const SizedBox(width: 10),
-              _buildStatCard('Anomalies', '3', 'Requires review'),
+              _buildStatCard('Avg Delay', '${report.averageDelayMinutes}m', 'Schedule variance'),
             ],
           ),
           const SizedBox(height: 24),
@@ -712,24 +719,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildAnomalyCard(
-            'Timing Shift: Work Clock-Out Delay',
-            'You clocked out >30 minutes late on 4 out of the last 6 workdays.',
-            'Tuesday: +35m | Wednesday: +40m | Thursday: +25m',
-            Colors.amber,
-          ),
-          _buildAnomalyCard(
-            'Candidate Correlation: Overtime & Family',
-            'Observed relationship: On days when work clock-out occurred past 05:30 PM, math practice was marked skipped or delayed.',
-            'Co-occurrence in 3 of 4 recent instances.',
-            const Color(0xFF38BDF8),
-          ),
-          _buildAnomalyCard(
-            'Repeated Note: Vehicle Starting Delay',
-            'Note "car engine hesitated / multi-start" was logged 3 times in the last 7 days.',
-            'Jul 16: "Hesitated" | Jul 18: "3 attempts" | Jul 20: "2 attempts"',
-            Colors.amber,
-          ),
+          ...report.detectedPatterns.map((pat) {
+            return _buildAnomalyCard(
+              'Timeline Variance Detected',
+              pat,
+              'Engine Schedule Rule Match',
+              Colors.amber,
+            );
+          }),
         ],
       ),
     );
