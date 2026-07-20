@@ -1,16 +1,16 @@
 # Product delivery status
 
-**Updated:** 2026-07-20 10:10:00  
-**Current commit:** 52d5037  
+**Updated:** 2026-07-20 10:48:00  
+**Current commit:** dc4c388  
 **Operating mode:** gated
 
 ## Current stage
 
-- Stage: Stage 5 — Andura UI proof
+- Stage: Stage 6 — Architecture & Roadmap
 - Status: awaiting-approval
 - Current phase: none
-- Next action: Await user approval of Linear Design System (Light & Dark mode) running on iOS Simulator (iPhone 17)
-- Decision required: User approval of visual direction (`artifacts/screens/iPhone_17_linear_dark.png` & `artifacts/screens/iPhone_17_linear_light.png`)
+- Next action: Await user approval of Architecture (`docs/ARCHITECTURE.md`) and Roadmap (`docs/ROADMAP.md`) before starting Phase 1 implementation.
+- Decision required: Approval of architecture decisions and 4-phase vertical slice roadmap order.
 
 ## Approved decisions
 
@@ -19,8 +19,7 @@
 - PRD approved (2026-07-20)
 - Screen inventory approved (2026-07-20)
 - Initial git repository initialized and initial commit created (`52d5037`)
-- Wired **Linear Design System** (`linear-app`) with live Light and Dark mode switching (`AnduraTheme.forSystem('linear-app', Brightness.light / Brightness.dark)`) (2026-07-20)
-- Tested & verified on iOS Simulator (iPhone 17) (2026-07-20)
+- Visual direction approved & Linear DS Light/Dark mode fixes committed (`dc4c388`)
 
 ## Artifacts
 
@@ -30,11 +29,11 @@
 | Feasibility | Approved | `docs/FEASIBILITY.md` |
 | PRD | Approved | `PRD.md` |
 | Screen inventory | Approved | `docs/screens/SCREEN_INVENTORY.md` |
-| UI proof (Flutter) | Awaiting approval | `lib/main.dart` |
-| iPhone 17 Dark Screenshot | Updated | `artifacts/screens/iPhone_17_linear_dark.png` |
-| iPhone 17 Light Screenshot | Updated | `artifacts/screens/iPhone_17_linear_light.png` |
-| Architecture | Not started | `docs/ARCHITECTURE.md` |
-| Roadmap | Not started | `docs/ROADMAP.md` |
+| UI proof (Flutter) | Approved | `lib/main.dart` |
+| iPhone 17 Dark Screenshot | Approved | `artifacts/screens/iPhone_17_linear_dark.png` |
+| iPhone 17 Light Screenshot | Approved | `artifacts/screens/iPhone_17_linear_light.png` |
+| Architecture | Awaiting approval | `docs/ARCHITECTURE.md` |
+| Roadmap | Awaiting approval | `docs/ROADMAP.md` |
 
 ## Validation baseline
 
@@ -44,8 +43,8 @@
 
 ## Known blockers and limitations
 
-- Mock data used for Stage 5 UI proof; pending Stage 6 Architecture & Stage 7 Vertical Slices for production database persistence.
+- Mock data currently in `lib/main.dart`; will be connected to SQLite database in Phase 1.
 
 ## Last completed work
 
-Integrated Andura UI's **Linear Design System** (`linear-app`) across `lib/main.dart` with support for dynamic Light and Dark mode switching via an AppBar toggle. Verified 100% clean static analysis (`flutter analyze`) and widget tests (`flutter test`).
+Created `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` for Stage 6 delivery.
