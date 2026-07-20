@@ -795,6 +795,97 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
+  Widget _buildSettingsView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Settings & System Status', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Appearance Theme', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
+                    Switch(
+                      value: widget.themeMode == ThemeMode.dark,
+                      onChanged: (_) => widget.onToggleTheme(),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Current Mode: ${widget.themeMode == ThemeMode.dark ? 'Linear Dark' : 'Linear Light'}',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Local SQLite Database', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 6),
+                Text('Storage File: routine_v4.db (${_items.length} active records)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.restore, size: 16),
+                  label: const Text('Restore Default Seed Routine Data'),
+                  onPressed: () async {
+                    await _repository.seedDataIfEmpty();
+                    final items = await _repository.getAllItems();
+                    if (mounted) {
+                      setState(() {
+                        _items = items;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('SQLite routine database reset to default seed items.')),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Local-First Architecture', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 6),
+                Text('Version 1.0.0 • Zero Cloud Dependency • 100% On-Device Analytics', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -888,9 +979,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             )
           : _selectedIndex == 1
               ? _buildPatternReportView()
-              : Center(
-                  child: Text('Settings & Topic Subscriptions', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
-                ),
+              : _buildSettingsView(),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF38BDF8),
         foregroundColor: Colors.black,
