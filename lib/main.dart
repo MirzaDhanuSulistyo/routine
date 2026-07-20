@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:andura_ui/andura_ui.dart';
 import 'data/routine_repository.dart';
+import 'data/briefing_service.dart';
 
 void main() {
   runApp(const RoutineApp());
@@ -96,6 +97,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   final String _currentDate = 'Monday, Jul 20, 2026';
   final RoutineRepository _repository = RoutineRepository();
+  final BriefingService _briefingService = BriefingService();
 
   List<RoutineItem> _items = [];
   bool _isLoading = true;
@@ -282,77 +284,216 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _showBriefingModal(RoutineItem item) {
+    final availableSources = _briefingService.availableSources;
+    List<String> selectedSources = List<String>.from(item.topicSources ?? ['TechCrunch', 'Bloomberg', 'HackerNews']);
+    bool isFetching = false;
+
     showDialog(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-          title: Text(item.title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18)),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  children: (item.topicSources ?? []).map((src) {
-                    return Chip(
-                      label: Text(src, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSecondaryContainer)),
-                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                Text('Finite Scheduled Briefing (3 Stories)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
-                const SizedBox(height: 12),
-                ...(item.briefStories ?? []).map((story) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 17, fontWeight: FontWeight.bold),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.tune, color: Theme.of(context).colorScheme.primary, size: 20),
+                    tooltip: 'Filter Sources',
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                        builder: (sheetCtx) {
+                          return StatefulBuilder(
+                            builder: (sheetStateCtx, setSheetState) {
+                              return Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Select Briefing Sources', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 12),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: availableSources.map((src) {
+                                        final isSelected = selectedSources.contains(src);
+                                        return FilterChip(
+                                          label: Text(src),
+                                          selected: isSelected,
+                                          onSelected: (val) {
+                                            setSheetState(() {
+                                              if (val) {
+                                                selectedSources.add(src);
+                                              } else if (selectedSources.length > 1) {
+                                                selectedSources.remove(src);
+                                              }
+                                            });
+                                            setDialogState(() {});
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: () => Navigator.pop(sheetCtx),
+                                        child: const Text('Apply Source Selection'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Active Sources:', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: selectedSources.map((src) {
+                        return Chip(
+                          visualDensity: VisualDensity.compact,
+                          label: Text(src, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSecondaryContainer)),
+                          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          story['source'] ?? '',
-                          style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          story['headline'] ?? '',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          story['summary'] ?? '',
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
-                        ),
+                        Text('Curated Stories (${(item.briefStories ?? []).length})', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold)),
+                        if (isFetching)
+                          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                        else
+                          TextButton.icon(
+                            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                            icon: const Icon(Icons.refresh, size: 14),
+                            label: const Text('Refresh Feed', style: TextStyle(fontSize: 12)),
+                            onPressed: () async {
+                              setDialogState(() => isFetching = true);
+                              final newStories = await _briefingService.fetchBriefingStories(selectedSources: selectedSources);
+                              final updatedItem = RoutineItem(
+                                id: item.id,
+                                title: item.title,
+                                itemType: item.itemType,
+                                category: item.category,
+                                timeOfDay: item.timeOfDay,
+                                scheduledTime: item.scheduledTime,
+                                eventTimestamp: item.eventTimestamp,
+                                recordedAtTimestamp: item.recordedAtTimestamp,
+                                isCompleted: item.isCompleted,
+                                notes: item.notes,
+                                numericValue: item.numericValue,
+                                unit: item.unit,
+                                prepOffsetMinutes: item.prepOffsetMinutes,
+                                topicSources: selectedSources,
+                                briefStories: newStories.map((s) => s.toMap()).toList(),
+                              );
+                              await _repository.insertItem(updatedItem);
+                              if (mounted) {
+                                setState(() {
+                                  final idx = _items.indexWhere((i) => i.id == item.id);
+                                  if (idx != -1) _items[idx] = updatedItem;
+                                });
+                              }
+                              setDialogState(() {
+                                item = updatedItem;
+                                isFetching = false;
+                              });
+                            },
+                          ),
                       ],
                     ),
-                  );
-                }),
+                    const SizedBox(height: 10),
+                    ...(item.briefStories ?? []).map((story) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    story['source'] ?? '',
+                                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer, fontSize: 10, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                if (story['category'] != null)
+                                  Text(
+                                    story['category']!,
+                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              story['headline'] ?? '',
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              story['summary'] ?? '',
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12, height: 1.3),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
+                  onPressed: () async {
+                    setState(() => item.isCompleted = true);
+                    await _repository.updateItemCompletion(item.id, true);
+                    if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                  },
+                  child: const Text('✓ Mark Briefing Complete', style: TextStyle(color: Colors.black)),
+                ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
-              onPressed: () {
-                setState(() => item.isCompleted = true);
-                _repository.updateItemCompletion(item.id, true);
-                Navigator.pop(context);
-              },
-              child: const Text('✓ Mark Briefing Complete', style: TextStyle(color: Colors.black)),
-            ),
-          ],
+            );
+          },
         );
       },
     );
