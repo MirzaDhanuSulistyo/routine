@@ -5,22 +5,34 @@ void main() {
   runApp(const RoutineApp());
 }
 
-class RoutineApp extends StatelessWidget {
+class RoutineApp extends StatefulWidget {
   const RoutineApp({super.key});
+
+  @override
+  State<RoutineApp> createState() => _RoutineAppState();
+}
+
+class _RoutineAppState extends State<RoutineApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Routine',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF38BDF8),
-          surface: Color(0xFF1E293B),
-        ),
+      themeMode: _themeMode,
+      theme: AnduraTheme.forSystem('linear-app', Brightness.light),
+      darkTheme: AnduraTheme.forSystem('linear-app', Brightness.dark),
+      home: MainNavigationScreen(
+        themeMode: _themeMode,
+        onToggleTheme: _toggleTheme,
       ),
-      home: const MainNavigationScreen(),
     );
   }
 }
@@ -62,7 +74,14 @@ class RoutineItem {
 }
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final ThemeMode themeMode;
+  final VoidCallback onToggleTheme;
+
+  const MainNavigationScreen({
+    super.key,
+    required this.themeMode,
+    required this.onToggleTheme,
+  });
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -196,7 +215,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -222,18 +241,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Fast Event & Observation Logger',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, color: Colors.grey),
+                        icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurfaceVariant),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Text('Target Date (Dual Timestamping)', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  Text('Target Date (Dual Timestamping)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
                   const SizedBox(height: 8),
                   AnduraChoiceRow<String>(
                     values: const ['Today', 'Yesterday', 'Tomorrow'],
@@ -330,8 +349,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          title: Text(item.title, style: const TextStyle(color: Colors.white, fontSize: 18)),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          title: Text(item.title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18)),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,39 +360,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   spacing: 6,
                   children: (item.topicSources ?? []).map((src) {
                     return Chip(
-                      label: Text(src, style: const TextStyle(fontSize: 10, color: Colors.white)),
-                      backgroundColor: Colors.blueGrey.shade800,
+                      label: Text(src, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSecondaryContainer)),
+                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
                     );
                   }).toList(),
                 ),
                 const SizedBox(height: 12),
-                const Text('Finite Scheduled Briefing (3 Stories)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Text('Finite Scheduled Briefing (3 Stories)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
                 const SizedBox(height: 12),
                 ...(item.briefStories ?? []).map((story) {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white12),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           story['source'] ?? '',
-                          style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           story['headline'] ?? '',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           story['summary'] ?? '',
-                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
                         ),
                       ],
                     ),
@@ -436,9 +455,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .5)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,7 +477,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         child: Text(
                           item.title,
                           style: TextStyle(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             decoration: item.isCompleted ? TextDecoration.lineThrough : null,
@@ -470,6 +489,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blueGrey.shade800,
                             foregroundColor: const Color(0xFF38BDF8),
+                            minimumSize: const Size(0, 36),
                           ),
                           onPressed: () => _showBriefingModal(item),
                           child: const Text('Read Brief'),
@@ -502,15 +522,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     const SizedBox(height: 6),
                     AnduraBadge(
                       label: 'Prep offset: ${item.prepOffsetMinutes}m lead time',
-                      color: const Color(0xFF1E3A8A),
+                      color: Theme.of(context).colorScheme.primaryContainer,
                     ),
                   ],
                   if (item.notes != null) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.black26,
+                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(6),
                         border: const Border(left: BorderSide(color: Color(0xFF38BDF8), width: 3)),
                       ),
@@ -519,7 +539,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           const Icon(Icons.edit_note, size: 14, color: Color(0xFF38BDF8)),
                           const SizedBox(width: 6),
                           Expanded(
-                            child: Text('Log: ${item.notes}', style: const TextStyle(color: Color(0xE6FFFFFF), fontSize: 12)),
+                            child: Text(
+                              'Log: ${item.notes}',
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                            ),
                           ),
                         ],
                       ),
@@ -534,18 +557,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.schedule, size: 10, color: Colors.white38),
+                            Icon(Icons.schedule, size: 10, color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7)),
                             const SizedBox(width: 4),
-                            Text('Event: ${item.eventTimestamp}', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                            Text(
+                              'Event: ${item.eventTimestamp}',
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7), fontSize: 10),
+                            ),
                           ],
                         ),
                         if (item.recordedAtTimestamp != null)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.save, size: 10, color: Colors.white38),
+                              Icon(Icons.save, size: 10, color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7)),
                               const SizedBox(width: 4),
-                              Text('Recorded: ${item.recordedAtTimestamp}', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                              Text(
+                                'Recorded: ${item.recordedAtTimestamp}',
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7), fontSize: 10),
+                              ),
                             ],
                           ),
                       ],
@@ -570,16 +599,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             decoration: BoxDecoration(
               color: Colors.blue.shade900.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue),
+              border: Border.all(color: Theme.of(context).colorScheme.primary),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.auto_awesome, color: Color(0xFF38BDF8)),
-                SizedBox(width: 10),
+                Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Understand Layer: Periodic sliding 7-day rule engine detecting timing shifts, repeated notes, and candidate correlations.',
-                    style: TextStyle(color: Colors.white, fontSize: 13),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13),
                   ),
                 ),
               ],
@@ -596,9 +625,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Detected Patterns & Anomalies',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           _buildAnomalyCard(
@@ -629,18 +658,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text(val, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(val, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 2),
-            Text(sub, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(sub, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -652,29 +681,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
         border: Border(left: BorderSide(color: accentColor, width: 4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 6),
-          Text(desc, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          Text(desc, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.black26,
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               children: [
-                const Icon(Icons.search, size: 12, color: Colors.grey),
+                Icon(Icons.search, size: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text('Evidence: $evidence', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                  child: Text(
+                    'Evidence: $evidence',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
+                  ),
                 ),
               ],
             ),
@@ -688,23 +720,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Text('Routine', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
-                SizedBox(width: 4),
-                Icon(Icons.bolt, color: Color(0xFF38BDF8), size: 18),
+                Text(
+                  'Routine',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.bolt, color: Theme.of(context).colorScheme.primary, size: 18),
               ],
             ),
-            Text('Remember it. Record it. Notice the pattern.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            Text(
+              'Remember it. Record it. Notice the pattern.',
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_task, color: Color(0xFF38BDF8)),
+            tooltip: widget.themeMode == ThemeMode.dark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            icon: Icon(
+              widget.themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            onPressed: widget.onToggleTheme,
+          ),
+          IconButton(
+            icon: Icon(Icons.add_task, color: Theme.of(context).colorScheme.primary),
             onPressed: _showFastLogSheet,
           ),
         ],
@@ -732,15 +781,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF38BDF8),
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      SizedBox(
+                        width: 115,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF38BDF8),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          ),
+                          onPressed: _showFastLogSheet,
+                          icon: const Icon(Icons.edit_note, size: 16),
+                          label: const Text('+ Fast Log', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
-                        onPressed: _showFastLogSheet,
-                        icon: const Icon(Icons.edit_note, size: 16),
-                        label: const Text('+ Fast Log', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                     ],
                   ),
@@ -755,8 +807,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             )
           : _selectedIndex == 1
               ? _buildPatternReportView()
-              : const Center(
-                  child: Text('Settings & Topic Subscriptions', style: TextStyle(color: Colors.white)),
+              : Center(
+                  child: Text('Settings & Topic Subscriptions', style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
                 ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF38BDF8),
@@ -767,20 +819,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        backgroundColor: const Color(0xFF0F172A),
-        selectedItemColor: const Color(0xFF38BDF8),
-        unselectedItemColor: Colors.grey,
         onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
-          BottomNavigationBarSpanItem(icon: Icon(Icons.timeline), label: 'Timeline'),
-          BottomNavigationBarSpanItem(icon: Icon(Icons.insights), label: 'Pattern Report'),
-          BottomNavigationBarSpanItem(icon: Icon(Icons.settings), label: 'Settings'),
+          BottomNavigationBarItem(icon: Icon(Icons.timeline), label: 'Timeline'),
+          BottomNavigationBarItem(icon: Icon(Icons.insights), label: 'Pattern Report'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
     );
   }
-}
-
-class BottomNavigationBarSpanItem extends BottomNavigationBarItem {
-  const BottomNavigationBarSpanItem({required super.icon, required super.label});
 }
