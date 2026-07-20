@@ -1,0 +1,136 @@
+@import "@andura-ui/react/styles.css";
+@import "@andura-ui/react/tokens.css";
+
+:root {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color-scheme: dark light;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--andura-color-bg-base, #0f172a);
+  color: var(--andura-color-text-primary, #f8fafc);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-title h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.motto-tag {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.nav-tabs-wrapper {
+  margin: 20px 0;
+}
+
+.time-section {
+  margin-bottom: 28px;
+}
+
+.time-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-card {
+  margin-bottom: 12px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.item-card:hover {
+  border-color: rgba(56, 189, 248, 0.3);
+  transform: translateY(-1px);
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.category-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.category-work { background: #38bdf8; }
+.category-family { background: #f472b6; }
+.category-home { background: #34d399; }
+.category-finance { background: #fbbf24; }
+.category-personal { background: #a78bfa; }
+
+.item-notes {
+  font-size: 13px;
+  color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-top: 10px;
+  border-left: 3px solid #38bdf8;
+}
+
+.timestamps-meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
+}
+
+.fab-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  gap: 12px;
+  z-index: 90;
+}
