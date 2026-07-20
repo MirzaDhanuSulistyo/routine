@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:andura_ui/andura_ui.dart';
+import 'data/routine_repository.dart';
 
 void main() {
   runApp(const RoutineApp());
 }
 
 class RoutineApp extends StatefulWidget {
-  const RoutineApp({super.key});
+  final ValueChanged<List<RoutineItem>>? onItemsLoaded;
+  const RoutineApp({super.key, this.onItemsLoaded});
 
   @override
   State<RoutineApp> createState() => _RoutineAppState();
@@ -32,6 +34,7 @@ class _RoutineAppState extends State<RoutineApp> {
       home: MainNavigationScreen(
         themeMode: _themeMode,
         onToggleTheme: _toggleTheme,
+        onItemsLoaded: widget.onItemsLoaded,
       ),
     );
   }
@@ -76,11 +79,13 @@ class RoutineItem {
 class MainNavigationScreen extends StatefulWidget {
   final ThemeMode themeMode;
   final VoidCallback onToggleTheme;
+  final ValueChanged<List<RoutineItem>>? onItemsLoaded;
 
   const MainNavigationScreen({
     super.key,
     required this.themeMode,
     required this.onToggleTheme,
+    this.onItemsLoaded,
   });
 
   @override
@@ -90,109 +95,42 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   final String _currentDate = 'Monday, Jul 20, 2026';
+  final RoutineRepository _repository = RoutineRepository();
 
-  late List<RoutineItem> _items;
+  List<RoutineItem> _items = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _items = [
-      RoutineItem(
-        id: '1',
-        title: 'Warm up car (Engine & AC prep)',
-        itemType: 'preparation',
-        category: 'home',
-        timeOfDay: 'morning',
-        scheduledTime: '06:40 AM',
-        prepOffsetMinutes: 10,
-        isCompleted: true,
-        eventTimestamp: '2026-07-20 06:42 AM',
-        recordedAtTimestamp: '2026-07-20 06:42 AM',
-        notes: 'Took two attempts to start smoothly',
-      ),
-      RoutineItem(
-        id: '2',
-        title: 'Morning Briefing — Tech, Markets & Social Trends',
-        itemType: 'briefing',
-        category: 'personal',
-        timeOfDay: 'morning',
-        scheduledTime: '07:00 AM',
-        isCompleted: true,
-        eventTimestamp: '2026-07-20 07:05 AM',
-        recordedAtTimestamp: '2026-07-20 07:05 AM',
-        topicSources: ['Reddit / r/technology', 'Bluesky / AI Update', 'GNews / Tech'],
-        briefStories: [
-          {
-            'source': 'Bluesky / AI Update',
-            'headline': 'Open-Source Multi-Modal Models Reach New Benchmarks',
-            'summary': 'New lightweight models achieve near state-of-the-art vision and code execution while running on consumer GPUs.',
-          },
-          {
-            'source': 'Reddit / r/technology',
-            'headline': 'Global Renewable Energy Grid Storage Surges 40%',
-            'summary': 'Grid battery deployments in Q2 surpassed all previous yearly milestones driven by lower LFP cell costs.',
-          },
-          {
-            'source': 'GNews / Markets',
-            'headline': 'Tech Earnings Week Kicks Off with Semiconductor Signals',
-            'summary': 'Key suppliers report strong server chip demand while consumer hardware orders normalize.',
-          },
-        ],
-      ),
-      RoutineItem(
-        id: '3',
-        title: 'Clock In to Work',
-        itemType: 'reminder',
-        category: 'work',
-        timeOfDay: 'morning',
-        scheduledTime: '08:00 AM',
-        isCompleted: true,
-        eventTimestamp: '2026-07-20 08:12 AM',
-        recordedAtTimestamp: '2026-07-20 08:12 AM',
-        notes: 'Arrived 12 minutes late due to road construction on 4th Ave',
-      ),
-      RoutineItem(
-        id: '4',
-        title: 'Clock Out of Work',
-        itemType: 'reminder',
-        category: 'work',
-        timeOfDay: 'afternoon',
-        scheduledTime: '05:00 PM',
-        isCompleted: false,
-      ),
-      RoutineItem(
-        id: '5',
-        title: 'Water Indoor & Balcony Plants',
-        itemType: 'maintenance',
-        category: 'home',
-        timeOfDay: 'afternoon',
-        scheduledTime: '06:00 PM',
-        isCompleted: false,
-      ),
-      RoutineItem(
-        id: '6',
-        title: 'Help Son Practice Math (Multiplication Tables)',
-        itemType: 'task',
-        category: 'family',
-        timeOfDay: 'evening',
-        scheduledTime: '06:30 PM',
-        isCompleted: false,
-      ),
-      RoutineItem(
-        id: '7',
-        title: 'Daily Life Observation & Sleep Log',
-        itemType: 'log',
-        category: 'personal',
-        timeOfDay: 'evening',
-        scheduledTime: '09:00 PM',
-        isCompleted: true,
-        eventTimestamp: '2026-07-20 09:15 AM',
-        recordedAtTimestamp: '2026-07-20 09:15 AM',
-        notes: 'Slept 5.5 hours. Plant soil looked dry.',
-        numericValue: 5.5,
-        unit: 'hours sleep',
-      ),
-    ];
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    try {
+      await _repository.seedDataIfEmpty();
+      final items = await _repository.getAllItems();
+      if (mounted) {
+        setState(() {
+          _items = items.isNotEmpty ? items : _repository.getSeedItems();
+        });
+        widget.onItemsLoaded?.call(_items);
+        debugPrint('LOADED SQLITE ITEMS: ${_items.length}');
+      }
+    } catch (e) {
+      debugPrint('Error loading items from SQLite: $e');
+      if (mounted) {
+        setState(() {
+          _items = _repository.getSeedItems();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Color _getCategoryColor(String cat) {
@@ -306,32 +244,31 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () {
-                      if (noteController.text.isNotEmpty || numController.text.isNotEmpty) {
-                        setState(() {
-                          _items.insert(
-                            0,
-                            RoutineItem(
-                              id: DateTime.now().millisecondsSinceEpoch.toString(),
-                              title: noteController.text.isNotEmpty
-                                  ? noteController.text.split('\n').first
-                                  : 'Quick Observation Log',
-                              itemType: 'log',
-                              category: category,
-                              timeOfDay: 'evening',
-                              scheduledTime: 'Fast Logged',
-                              isCompleted: true,
-                              eventTimestamp: '$dateMode 09:00 AM',
-                              recordedAtTimestamp: 'Today 09:35 AM',
-                              notes: noteController.text.isNotEmpty ? noteController.text : null,
-                              numericValue: double.tryParse(numController.text),
-                              unit: numController.text.isNotEmpty ? 'units' : null,
-                            ),
+                      onPressed: () async {
+                        if (noteController.text.isNotEmpty || numController.text.isNotEmpty) {
+                          final newItem = RoutineItem(
+                            id: DateTime.now().millisecondsSinceEpoch.toString(),
+                            title: noteController.text.isNotEmpty
+                                ? noteController.text.split('\n').first
+                                : 'Quick Observation Log',
+                            itemType: 'log',
+                            category: category,
+                            timeOfDay: 'evening',
+                            scheduledTime: 'Fast Logged',
+                            isCompleted: true,
+                            eventTimestamp: '$dateMode 09:00 AM',
+                            recordedAtTimestamp: 'Today 09:35 AM',
+                            notes: noteController.text.isNotEmpty ? noteController.text : null,
+                            numericValue: double.tryParse(numController.text),
+                            unit: numController.text.isNotEmpty ? 'units' : null,
                           );
-                        });
-                      }
-                      Navigator.pop(context);
-                    },
+                          setState(() {
+                            _items.insert(0, newItem);
+                          });
+                          await _repository.insertItem(newItem);
+                        }
+                        if (context.mounted) Navigator.pop(context);
+                      },
                     child: const Text('Save Log Entry', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   ),
                 ),
@@ -410,6 +347,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
               onPressed: () {
                 setState(() => item.isCompleted = true);
+                _repository.updateItemCompletion(item.id, true);
                 Navigator.pop(context);
               },
               child: const Text('✓ Mark Briefing Complete', style: TextStyle(color: Colors.black)),
@@ -421,7 +359,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Widget _buildTimelineSection(String title, String timeOfDay, IconData sectionIcon) {
-    final sectionItems = _items.where((i) => i.timeOfDay == timeOfDay).toList();
+    final sectionItems = _items
+        .where((i) => i.timeOfDay.toLowerCase().trim() == timeOfDay.toLowerCase().trim())
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,6 +444,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             setState(() {
                               item.isCompleted = !item.isCompleted;
                             });
+                            _repository.updateItemCompletion(item.id, item.isCompleted);
                           },
                         ),
                     ],
@@ -758,8 +699,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
         ],
       ),
-      body: _selectedIndex == 0
-          ? SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _selectedIndex == 0
+              ? SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
