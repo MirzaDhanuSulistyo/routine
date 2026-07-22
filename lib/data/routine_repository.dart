@@ -73,6 +73,17 @@ class RoutineRepository {
     );
   }
 
+  Future<RoutineItem?> getItemById(String id) async {
+    final db = await dbHelper.database;
+    final maps = await db.query(
+      'items',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return maps.isEmpty ? null : _mapToRoutineItem(maps.first);
+  }
+
   Future<void> updateItemCompletion(String id, bool isCompleted) async {
     final db = await dbHelper.database;
     await db.update(
@@ -112,6 +123,10 @@ class RoutineRepository {
       timeOfDay: map['time_of_day']?.toString() ?? 'morning',
       scheduledTime: map['scheduled_time']?.toString() ?? '09:00 AM',
       scheduledDate: map['scheduled_date']?.toString(),
+      recurrenceRule: map['recurrence_rule']?.toString() ?? 'none',
+      notificationsEnabled:
+          map['notifications_enabled'] == 1 ||
+          map['notifications_enabled'] == true,
       eventTimestamp: map['event_timestamp']?.toString(),
       recordedAtTimestamp: map['recorded_at_timestamp']?.toString(),
       isCompleted: map['is_completed'] == 1 || map['is_completed'] == true,
@@ -137,6 +152,8 @@ class RoutineRepository {
       'time_of_day': item.timeOfDay,
       'scheduled_time': item.scheduledTime,
       'scheduled_date': item.scheduledDate,
+      'recurrence_rule': item.recurrenceRule,
+      'notifications_enabled': item.notificationsEnabled ? 1 : 0,
       'event_timestamp': item.eventTimestamp,
       'recorded_at_timestamp': item.recordedAtTimestamp,
       'is_completed': item.isCompleted ? 1 : 0,

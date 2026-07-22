@@ -18,22 +18,26 @@ Delivered:
 
 Remaining:
 - Edit/delete interactions
-- Recurring schedule model
+- Per-occurrence completion state for recurring schedules
 - Timeline search and filters
 
 ## Phase 2 — Native reminders and finite briefings
 
-**Status:** partial
+**Status:** substantially complete
 
 Delivered:
 - Preparation lead-time model
+- Daily and weekly recurrence persistence
+- Timezone-aware `flutter_local_notifications` scheduling
+- Exact-alarm permission flow with inexact fallback on Android
+- Done, Snooze 10m, and Add Note actions
+- Android reboot rescheduling receivers and iOS action registration
 - Finite briefing UI
 - Source selection and cached SQLite representation
 
 Remaining:
-- `flutter_local_notifications` integration
-- Done, Snooze, and Add Note notification actions
-- Permission-loss handling
+- Proactive permission-loss diagnostics
+- Per-occurrence completion handling for recurring notifications
 - Live RSS/API adapters, cache age, and offline/error states
 
 ## Phase 3 — Seven-day pattern engine

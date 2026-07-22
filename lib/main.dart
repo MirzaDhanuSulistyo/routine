@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:andura_ui/andura_ui.dart';
 import 'data/routine_repository.dart';
 import 'data/briefing_service.dart';
 import 'data/anomaly_engine.dart';
 import 'domain/routine_item.dart';
+import 'services/reminder_notification_service.dart';
 
 export 'domain/routine_item.dart';
 
@@ -52,6 +55,7 @@ class MainNavigationScreen extends StatefulWidget {
   final ThemeMode themeMode;
   final VoidCallback onToggleTheme;
   final ValueChanged<List<RoutineItem>>? onItemsLoaded;
+  final List<RoutineItem>? initialItems;
   final int initialIndex;
 
   const MainNavigationScreen({
@@ -59,6 +63,7 @@ class MainNavigationScreen extends StatefulWidget {
     required this.themeMode,
     required this.onToggleTheme,
     this.onItemsLoaded,
+    this.initialItems,
     this.initialIndex = 0,
   });
 
@@ -72,14 +77,37 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final RoutineRepository _repository = RoutineRepository();
   final BriefingService _briefingService = BriefingService();
   final AnomalyAnalyticsEngine _anomalyEngine = AnomalyAnalyticsEngine();
+  final ReminderNotificationService _reminders =
+      ReminderNotificationService.instance;
 
   List<RoutineItem> _items = [];
+  StreamSubscription? _notificationSubscription;
+  int _pendingReminderCount = 0;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadItems();
+    _notificationSubscription = _reminders.responses.listen((response) {
+      if (!mounted) return;
+      if (response.actionId == 'routine_add_note') {
+        _showFastLogSheet();
+      } else {
+        _loadItems();
+      }
+    });
+    if (widget.initialItems != null) {
+      _items = List<RoutineItem>.from(widget.initialItems!);
+      _isLoading = false;
+    } else {
+      _loadItems();
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadItems() async {
@@ -92,6 +120,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         });
         widget.onItemsLoaded?.call(_items);
         debugPrint('LOADED SQLITE ITEMS: ${_items.length}');
+        unawaited(_syncReminders(_items));
       }
     } catch (e) {
       debugPrint('Error loading items from SQLite: $e');
@@ -107,6 +136,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         });
       }
     }
+  }
+
+  Future<void> _syncReminders(List<RoutineItem> items) async {
+    await _reminders.rescheduleAll(items);
+    final pendingCount = await _reminders.pendingCount();
+    if (mounted) setState(() => _pendingReminderCount = pendingCount);
   }
 
   Color _getCategoryColor(String cat) {
@@ -171,7 +206,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   List<RoutineItem> get _selectedDateItems {
     final items = _items
-        .where((item) => item.scheduledDate == _dateKey(_selectedDate))
+        .where((item) => _occursOnDate(item, _selectedDate))
         .toList();
     items.sort(
       (a, b) => _scheduledTimeMinutes(
@@ -179,6 +214,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ).compareTo(_scheduledTimeMinutes(b.scheduledTime)),
     );
     return items;
+  }
+
+  bool _occursOnDate(RoutineItem item, DateTime date) {
+    final start = DateTime.tryParse(item.scheduledDate ?? '');
+    if (start == null) return false;
+    final target = DateTime(date.year, date.month, date.day);
+    final first = DateTime(start.year, start.month, start.day);
+    if (target.isBefore(first)) return false;
+    final dayDifference = target.difference(first).inDays;
+    return switch (item.recurrenceRule) {
+      'daily' => true,
+      'weekly' => dayDifference % 7 == 0,
+      _ => dayDifference == 0,
+    };
   }
 
   int _scheduledTimeMinutes(String value) {
@@ -210,6 +259,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final prepController = TextEditingController();
     var itemType = 'task';
     var category = 'personal';
+    var recurrenceRule = 'none';
+    var notificationsEnabled = false;
     var date = _selectedDate;
     var time = TimeOfDay.now();
 
@@ -320,6 +371,31 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                AnduraSelect<String>(
+                  value: recurrenceRule,
+                  labelText: 'Repeat',
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'none',
+                      child: Text('Does not repeat'),
+                    ),
+                    DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                    DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => recurrenceRule = value!),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Notify me'),
+                  subtitle: const Text(
+                    'Done, Snooze 10m, and Add Note actions',
+                  ),
+                  value: notificationsEnabled,
+                  onChanged: (value) =>
+                      setDialogState(() => notificationsEnabled = value),
+                ),
                 if (itemType == 'preparation') ...[
                   const SizedBox(height: 12),
                   AnduraTextField(
@@ -348,6 +424,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               onPressed: () async {
                 final title = titleController.text.trim();
                 if (title.isEmpty) return;
+                var canNotify = notificationsEnabled;
+                if (canNotify) {
+                  canNotify = await _reminders.requestPermissions();
+                }
                 final newItem = RoutineItem(
                   id: DateTime.now().microsecondsSinceEpoch.toString(),
                   title: title,
@@ -360,6 +440,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       : 'evening',
                   scheduledTime: _formatTime(time),
                   scheduledDate: _dateKey(date),
+                  recurrenceRule: recurrenceRule,
+                  notificationsEnabled: canNotify,
                   notes: notesController.text.trim().isEmpty
                       ? null
                       : notesController.text.trim(),
@@ -372,12 +454,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   briefStories: itemType == 'briefing' ? [] : null,
                 );
                 await _repository.insertItem(newItem);
+                await _reminders.schedule(newItem);
+                final pendingCount = await _reminders.pendingCount();
                 if (!mounted) return;
                 setState(() {
+                  _pendingReminderCount = pendingCount;
                   _items.add(newItem);
                   _selectedDate = date;
                 });
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (notificationsEnabled && !canNotify && mounted) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Item created, but notification permission was not granted.',
+                      ),
+                    ),
+                  );
+                }
               },
               child: const Text('Create Item'),
             ),
@@ -776,6 +870,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                 timeOfDay: item.timeOfDay,
                                 scheduledTime: item.scheduledTime,
                                 scheduledDate: item.scheduledDate,
+                                recurrenceRule: item.recurrenceRule,
+                                notificationsEnabled: item.notificationsEnabled,
                                 eventTimestamp: item.eventTimestamp,
                                 recordedAtTimestamp: item.recordedAtTimestamp,
                                 isCompleted: item.isCompleted,
@@ -898,6 +994,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   onPressed: () async {
                     setState(() => item.isCompleted = true);
                     await _repository.updateItemCompletion(item.id, true);
+                    await _reminders.schedule(item);
                     if (dialogCtx.mounted) Navigator.pop(dialogCtx);
                   },
                   child: const Text(
@@ -1016,14 +1113,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                 ? const Color(0xFF34D399)
                                 : Colors.grey,
                           ),
-                          onPressed: () {
+                          onPressed: () async {
                             setState(() {
                               item.isCompleted = !item.isCompleted;
                             });
-                            _repository.updateItemCompletion(
+                            await _repository.updateItemCompletion(
                               item.id,
                               item.isCompleted,
                             );
+                            await _reminders.schedule(item);
+                            final pendingCount = await _reminders
+                                .pendingCount();
+                            if (mounted) {
+                              setState(
+                                () => _pendingReminderCount = pendingCount,
+                              );
+                            }
                           },
                         ),
                     ],
@@ -1054,6 +1159,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       ),
                     ],
                   ),
+                  if (item.recurrenceRule != 'none' ||
+                      item.notificationsEnabled) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        if (item.recurrenceRule != 'none')
+                          AnduraBadge(
+                            label: item.recurrenceRule == 'daily'
+                                ? 'Repeats daily'
+                                : 'Repeats weekly',
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.secondaryContainer,
+                          ),
+                        if (item.notificationsEnabled)
+                          AnduraBadge(
+                            label: 'Reminder enabled',
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.tertiaryContainer,
+                          ),
+                      ],
+                    ),
+                  ],
                   if (item.prepOffsetMinutes != null) ...[
                     const SizedBox(height: 6),
                     AnduraBadge(
@@ -1422,6 +1553,56 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
+                  'Native Reminders',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$_pendingReminderCount pending notification${_pendingReminderCount == 1 ? '' : 's'} • Done, Snooze, Add Note',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.notifications_active, size: 16),
+                  label: const Text('Enable Notification Permissions'),
+                  onPressed: () async {
+                    final granted = await _reminders.requestPermissions();
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          granted
+                              ? 'Notification permissions are enabled.'
+                              : 'Notification permission was not granted.',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   'Local SQLite Database',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
@@ -1442,11 +1623,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   icon: const Icon(Icons.restore, size: 16),
                   label: const Text('Restore Default Seed Routine Data'),
                   onPressed: () async {
+                    for (final item in _items) {
+                      await _reminders.cancel(item.id);
+                    }
                     await _repository.resetToSeedItems(date: _selectedDate);
                     final items = await _repository.getAllItems();
+                    final pendingCount = await _reminders.pendingCount();
                     if (mounted) {
                       setState(() {
                         _items = items;
+                        _pendingReminderCount = pendingCount;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

@@ -33,7 +33,10 @@ void main() {
         itemType: 'log',
         category: 'home',
         timeOfDay: 'evening',
-        scheduledTime: 'Fast Logged',
+        scheduledTime: '09:00 PM',
+        scheduledDate: '2026-07-20',
+        recurrenceRule: 'daily',
+        notificationsEnabled: true,
         isCompleted: true,
         eventTimestamp: 'Today 06:00 PM',
         recordedAtTimestamp: 'Today 06:05 PM',
@@ -48,6 +51,8 @@ void main() {
       items = await repository.getAllItems();
       final updated = items.firstWhere((i) => i.id == 'test_99');
       expect(updated.isCompleted, isFalse);
+      expect(updated.recurrenceRule, 'daily');
+      expect(updated.notificationsEnabled, isTrue);
     },
   );
 

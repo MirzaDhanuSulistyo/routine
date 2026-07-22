@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -47,6 +47,8 @@ CREATE TABLE items (
   time_of_day TEXT NOT NULL,
   scheduled_time TEXT NOT NULL,
   scheduled_date TEXT,
+  recurrence_rule TEXT NOT NULL DEFAULT 'none',
+  notifications_enabled INTEGER NOT NULL DEFAULT 0,
   event_timestamp TEXT,
   recorded_at_timestamp TEXT,
   is_completed INTEGER NOT NULL DEFAULT 0,
@@ -72,6 +74,14 @@ CREATE TABLE items (
       );
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_items_scheduled_date ON items(scheduled_date)',
+      );
+    }
+    if (oldVersion < 3) {
+      await db.execute(
+        "ALTER TABLE items ADD COLUMN recurrence_rule TEXT NOT NULL DEFAULT 'none'",
+      );
+      await db.execute(
+        'ALTER TABLE items ADD COLUMN notifications_enabled INTEGER NOT NULL DEFAULT 0',
       );
     }
   }

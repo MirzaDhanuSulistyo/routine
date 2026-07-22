@@ -9,6 +9,9 @@ Routine is a local-first personal life operations assistant for planning expecte
 - Daily timeline grouped into morning, afternoon, and evening
 - Past and future date navigation
 - Flexible item creation across reminders, tasks, maintenance, deadlines, preparation, briefings, logs, and measurements
+- Daily and weekly recurring timeline items
+- Native scheduled notifications with Done, Snooze 10m, and Add Note actions
+- Preparation lead-time alerts with timezone-aware scheduling
 - Fast observation and numeric logging with separate event and recorded timestamps
 - Local SQLite persistence
 - Finite, source-filtered briefing cards using demo content
@@ -50,4 +53,4 @@ flutter test
 
 ## Production gaps
 
-The app remains a beta. Local notifications, recurrence, live briefing feeds, robust seven-day correlation analysis, data export, and broader integration testing are still planned.
+The app remains a beta. Per-occurrence completion history for recurring items, live briefing feeds, robust seven-day correlation analysis, data export, and broader integration testing are still planned.
