@@ -15,10 +15,10 @@ Delivered:
 - Flexible item creation
 - Fast logs with separate event and recorded timestamps
 - Completion updates and functional seed restore
+- Per-occurrence completion records with event and recorded timestamps
+- Edit/delete interactions with cascading history cleanup
 
 Remaining:
-- Edit/delete interactions
-- Per-occurrence completion state for recurring schedules
 - Timeline search and filters
 
 ## Phase 2 — Native reminders and finite briefings
@@ -32,12 +32,13 @@ Delivered:
 - Exact-alarm permission flow with inexact fallback on Android
 - Done, Snooze 10m, and Add Note actions
 - Android reboot rescheduling receivers and iOS action registration
+- Reminder cancellation/rescheduling after edits, deletion, and completion
+- Recurring notification actions recorded against the active occurrence date
 - Finite briefing UI
 - Source selection and cached SQLite representation
 
 Remaining:
 - Proactive permission-loss diagnostics
-- Per-occurrence completion handling for recurring notifications
 - Live RSS/API adapters, cache age, and offline/error states
 
 ## Phase 3 — Seven-day pattern engine

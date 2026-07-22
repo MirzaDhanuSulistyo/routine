@@ -6,6 +6,7 @@ import 'data/routine_repository.dart';
 import 'data/briefing_service.dart';
 import 'data/anomaly_engine.dart';
 import 'domain/routine_item.dart';
+import 'domain/routine_occurrence.dart';
 import 'services/reminder_notification_service.dart';
 
 export 'domain/routine_item.dart';
@@ -81,6 +82,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ReminderNotificationService.instance;
 
   List<RoutineItem> _items = [];
+  Map<String, RoutineOccurrence> _occurrences = {};
   StreamSubscription? _notificationSubscription;
   int _pendingReminderCount = 0;
   bool _isLoading = true;
@@ -114,9 +116,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     try {
       await _repository.seedDataIfEmpty();
       final items = await _repository.getAllItems();
+      final occurrences = await _repository.getAllOccurrences();
       if (mounted) {
         setState(() {
           _items = items.isNotEmpty ? items : _repository.getSeedItems();
+          _occurrences = {for (final entry in occurrences) entry.key: entry};
         });
         widget.onItemsLoaded?.call(_items);
         debugPrint('LOADED SQLITE ITEMS: ${_items.length}');
@@ -230,6 +234,60 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     };
   }
 
+  bool _isCompletedOnDate(RoutineItem item, DateTime date) {
+    if (item.recurrenceRule == 'none') return item.isCompleted;
+    final key = RoutineOccurrence.keyFor(item.id, _dateKey(date));
+    return _occurrences[key]?.isCompleted ?? false;
+  }
+
+  Future<void> _setItemCompletion(
+    RoutineItem item,
+    bool isCompleted, {
+    DateTime? occurrenceDate,
+  }) async {
+    final date = occurrenceDate ?? _selectedDate;
+    if (item.recurrenceRule == 'none') {
+      setState(() => item.isCompleted = isCompleted);
+      await _repository.updateItemCompletion(item.id, isCompleted);
+    } else {
+      final dateKey = _dateKey(date);
+      final now = DateTime.now();
+      final eventTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        now.hour,
+        now.minute,
+        now.second,
+      );
+      await _repository.setOccurrenceCompletion(
+        itemId: item.id,
+        occurrenceDate: dateKey,
+        isCompleted: isCompleted,
+        eventTime: eventTime,
+      );
+      if (!mounted) return;
+      setState(() {
+        final key = RoutineOccurrence.keyFor(item.id, dateKey);
+        if (isCompleted) {
+          _occurrences[key] = RoutineOccurrence(
+            itemId: item.id,
+            occurrenceDate: dateKey,
+            isCompleted: true,
+            eventTimestamp: eventTime.toIso8601String(),
+            recordedAtTimestamp: now.toIso8601String(),
+          );
+        } else {
+          _occurrences.remove(key);
+        }
+      });
+    }
+
+    await _reminders.schedule(item);
+    final pendingCount = await _reminders.pendingCount();
+    if (mounted) setState(() => _pendingReminderCount = pendingCount);
+  }
+
   int _scheduledTimeMinutes(String value) {
     final match = RegExp(
       r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
@@ -253,22 +311,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
-  Future<void> _showItemBuilder() async {
-    final titleController = TextEditingController();
-    final notesController = TextEditingController();
-    final prepController = TextEditingController();
-    var itemType = 'task';
-    var category = 'personal';
-    var recurrenceRule = 'none';
-    var notificationsEnabled = false;
-    var date = _selectedDate;
-    var time = TimeOfDay.now();
+  Future<void> _showItemBuilder({RoutineItem? existingItem}) async {
+    final titleController = TextEditingController(text: existingItem?.title);
+    final notesController = TextEditingController(text: existingItem?.notes);
+    final prepController = TextEditingController(
+      text: existingItem?.prepOffsetMinutes?.toString(),
+    );
+    var itemType = existingItem?.itemType ?? 'task';
+    var category = existingItem?.category ?? 'personal';
+    var recurrenceRule = existingItem?.recurrenceRule ?? 'none';
+    var notificationsEnabled = existingItem?.notificationsEnabled ?? false;
+    var date =
+        DateTime.tryParse(existingItem?.scheduledDate ?? '') ?? _selectedDate;
+    final initialMinutes = existingItem == null
+        ? null
+        : _scheduledTimeMinutes(existingItem.scheduledTime);
+    var time = initialMinutes == null || initialMinutes >= 24 * 60
+        ? TimeOfDay.now()
+        : TimeOfDay(hour: initialMinutes ~/ 60, minute: initialMinutes % 60);
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create Routine Item'),
+          title: Text(
+            existingItem == null ? 'Create Routine Item' : 'Edit Routine Item',
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -429,7 +497,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   canNotify = await _reminders.requestPermissions();
                 }
                 final newItem = RoutineItem(
-                  id: DateTime.now().microsecondsSinceEpoch.toString(),
+                  id:
+                      existingItem?.id ??
+                      DateTime.now().microsecondsSinceEpoch.toString(),
                   title: title,
                   itemType: itemType,
                   category: category,
@@ -442,16 +512,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   scheduledDate: _dateKey(date),
                   recurrenceRule: recurrenceRule,
                   notificationsEnabled: canNotify,
+                  eventTimestamp: existingItem?.eventTimestamp,
+                  recordedAtTimestamp: existingItem?.recordedAtTimestamp,
+                  isCompleted: recurrenceRule == 'none'
+                      ? existingItem?.isCompleted ?? false
+                      : false,
                   notes: notesController.text.trim().isEmpty
                       ? null
                       : notesController.text.trim(),
                   prepOffsetMinutes: itemType == 'preparation'
                       ? int.tryParse(prepController.text)
                       : null,
+                  numericValue: existingItem?.numericValue,
+                  unit: existingItem?.unit,
                   topicSources: itemType == 'briefing'
-                      ? ['TechCrunch', 'Bloomberg', 'HackerNews']
+                      ? existingItem?.topicSources ??
+                            ['TechCrunch', 'Bloomberg', 'HackerNews']
                       : null,
-                  briefStories: itemType == 'briefing' ? [] : null,
+                  briefStories: itemType == 'briefing'
+                      ? existingItem?.briefStories ?? []
+                      : null,
                 );
                 await _repository.insertItem(newItem);
                 await _reminders.schedule(newItem);
@@ -459,7 +539,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 if (!mounted) return;
                 setState(() {
                   _pendingReminderCount = pendingCount;
-                  _items.add(newItem);
+                  final existingIndex = _items.indexWhere(
+                    (item) => item.id == newItem.id,
+                  );
+                  if (existingIndex == -1) {
+                    _items.add(newItem);
+                  } else {
+                    _items[existingIndex] = newItem;
+                  }
                   _selectedDate = date;
                 });
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
@@ -473,7 +560,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   );
                 }
               },
-              child: const Text('Create Item'),
+              child: Text(
+                existingItem == null ? 'Create Item' : 'Save Changes',
+              ),
             ),
           ],
         ),
@@ -483,6 +572,48 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     titleController.dispose();
     notesController.dispose();
     prepController.dispose();
+  }
+
+  Future<void> _confirmDeleteItem(RoutineItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete routine item?'),
+        content: Text(
+          item.recurrenceRule == 'none'
+              ? '“${item.title}” and its stored data will be removed.'
+              : '“${item.title}” and all of its completion history will be removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await _reminders.cancel(item.id);
+    await _repository.deleteItem(item.id);
+    final pendingCount = await _reminders.pendingCount();
+    if (!mounted) return;
+    setState(() {
+      _items.removeWhere((entry) => entry.id == item.id);
+      _occurrences.removeWhere((_, occurrence) => occurrence.itemId == item.id);
+      _pendingReminderCount = pendingCount;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Deleted “${item.title}”.')));
   }
 
   void _showFastLogSheet() {
@@ -992,9 +1123,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     backgroundColor: const Color(0xFF38BDF8),
                   ),
                   onPressed: () async {
-                    setState(() => item.isCompleted = true);
-                    await _repository.updateItemCompletion(item.id, true);
-                    await _reminders.schedule(item);
+                    await _setItemCompletion(
+                      item,
+                      true,
+                      occurrenceDate: _selectedDate,
+                    );
                     if (dialogCtx.mounted) Navigator.pop(dialogCtx);
                   },
                   child: const Text(
@@ -1054,6 +1187,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           )
         else
           ...sectionItems.map((item) {
+            final isCompleted = _isCompletedOnDate(item, _selectedDate);
+            final occurrence = item.recurrenceRule == 'none'
+                ? null
+                : _occurrences[RoutineOccurrence.keyFor(
+                    item.id,
+                    _dateKey(_selectedDate),
+                  )];
+            final eventTimestamp =
+                occurrence?.eventTimestamp ?? item.eventTimestamp;
+            final recordedAtTimestamp =
+                occurrence?.recordedAtTimestamp ?? item.recordedAtTimestamp;
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(14),
@@ -1087,7 +1231,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            decoration: item.isCompleted
+                            decoration: isCompleted
                                 ? TextDecoration.lineThrough
                                 : null,
                           ),
@@ -1106,31 +1250,47 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       else
                         IconButton(
                           icon: Icon(
-                            item.isCompleted
+                            isCompleted
                                 ? Icons.check_circle
                                 : Icons.radio_button_unchecked,
-                            color: item.isCompleted
+                            color: isCompleted
                                 ? const Color(0xFF34D399)
                                 : Colors.grey,
                           ),
-                          onPressed: () async {
-                            setState(() {
-                              item.isCompleted = !item.isCompleted;
-                            });
-                            await _repository.updateItemCompletion(
-                              item.id,
-                              item.isCompleted,
-                            );
-                            await _reminders.schedule(item);
-                            final pendingCount = await _reminders
-                                .pendingCount();
-                            if (mounted) {
-                              setState(
-                                () => _pendingReminderCount = pendingCount,
-                              );
-                            }
-                          },
+                          onPressed: () => _setItemCompletion(
+                            item,
+                            !isCompleted,
+                            occurrenceDate: _selectedDate,
+                          ),
                         ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Item actions',
+                        onSelected: (action) {
+                          if (action == 'edit') {
+                            _showItemBuilder(existingItem: item);
+                          } else if (action == 'delete') {
+                            _confirmDeleteItem(item);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: ListTile(
+                              leading: Icon(Icons.edit),
+                              title: Text('Edit'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Delete'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1227,7 +1387,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       ),
                     ),
                   ],
-                  if (item.eventTimestamp != null) ...[
+                  if (eventTimestamp != null) ...[
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 12,
@@ -1246,7 +1406,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Event: ${_formatTimestamp(item.eventTimestamp!)}',
+                              'Event: ${_formatTimestamp(eventTimestamp)}',
                               style: TextStyle(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -1257,7 +1417,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             ),
                           ],
                         ),
-                        if (item.recordedAtTimestamp != null)
+                        if (recordedAtTimestamp != null)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -1271,7 +1431,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Recorded: ${_formatTimestamp(item.recordedAtTimestamp!)}',
+                                'Recorded: ${_formatTimestamp(recordedAtTimestamp)}',
                                 style: TextStyle(
                                   color: Theme.of(context)
                                       .colorScheme
@@ -1632,6 +1792,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     if (mounted) {
                       setState(() {
                         _items = items;
+                        _occurrences = {};
                         _pendingReminderCount = pendingCount;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(

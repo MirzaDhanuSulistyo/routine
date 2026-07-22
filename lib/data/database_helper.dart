@@ -31,7 +31,8 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
+      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -63,6 +64,25 @@ CREATE TABLE items (
     await db.execute(
       'CREATE INDEX idx_items_scheduled_date ON items(scheduled_date)',
     );
+    await _createOccurrencesTable(db);
+  }
+
+  Future<void> _createOccurrencesTable(Database db) async {
+    await db.execute('''
+CREATE TABLE IF NOT EXISTS item_occurrences (
+  item_id TEXT NOT NULL,
+  occurrence_date TEXT NOT NULL,
+  is_completed INTEGER NOT NULL DEFAULT 0,
+  event_timestamp TEXT,
+  recorded_at_timestamp TEXT NOT NULL,
+  PRIMARY KEY (item_id, occurrence_date),
+  FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
+)
+''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_occurrences_date '
+      'ON item_occurrences(occurrence_date)',
+    );
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -83,6 +103,9 @@ CREATE TABLE items (
       await db.execute(
         'ALTER TABLE items ADD COLUMN notifications_enabled INTEGER NOT NULL DEFAULT 0',
       );
+    }
+    if (oldVersion < 4) {
+      await _createOccurrencesTable(db);
     }
   }
 

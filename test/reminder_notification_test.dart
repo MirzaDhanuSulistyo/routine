@@ -60,6 +60,23 @@ void main() {
     expect(weekly.recurrenceComponents, DateTimeComponents.dayOfWeekAndTime);
   });
 
+  test('maps a cross-midnight preparation action to its target date', () {
+    final item = reminder(
+      date: '2026-07-20',
+      time: '12:05 AM',
+      recurrence: 'daily',
+      prepOffset: 10,
+    );
+
+    expect(
+      ReminderNotificationService.occurrenceDateForAction(
+        item,
+        now: DateTime(2026, 7, 20, 23, 55),
+      ),
+      '2026-07-21',
+    );
+  });
+
   test('applies preparation lead time and creates stable notification IDs', () {
     final schedule = ReminderNotificationService.scheduleFor(
       reminder(prepOffset: 10),

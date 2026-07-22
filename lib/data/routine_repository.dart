@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/routine_item.dart';
+import '../domain/routine_occurrence.dart';
 import 'database_helper.dart';
 
 class RoutineRepository {
@@ -33,14 +34,30 @@ class RoutineRepository {
   }
 
   Future<List<RoutineItem>> getItemsForDate(DateTime date) async {
+    final items = await getAllItems();
+    final dateKey = _dateKey(date);
     final db = await dbHelper.database;
-    final maps = await db.query(
-      'items',
-      where: 'scheduled_date = ?',
-      whereArgs: [_dateKey(date)],
+    final occurrenceMaps = await db.query(
+      'item_occurrences',
+      where: 'occurrence_date = ?',
+      whereArgs: [dateKey],
     );
-    final items = maps.map(_mapToRoutineItem).toList()..sort(_compareItems);
-    return items;
+    final completedIds = occurrenceMaps
+        .map(_mapToOccurrence)
+        .where((entry) => entry.isCompleted)
+        .map((entry) => entry.itemId)
+        .toSet();
+
+    final projected =
+        items.where((item) => _occursOnDate(item, date)).map((item) {
+          if (item.recurrenceRule == 'none') return item;
+          return item.copyWith(isCompleted: completedIds.contains(item.id));
+        }).toList()..sort(
+          (a, b) => _timeMinutes(
+            a.scheduledTime,
+          ).compareTo(_timeMinutes(b.scheduledTime)),
+        );
+    return projected;
   }
 
   Future<void> seedDataIfEmpty() async {
@@ -55,6 +72,7 @@ class RoutineRepository {
     final db = await dbHelper.database;
     final seeds = getSeedItems(date: date);
     await db.transaction((txn) async {
+      await txn.delete('item_occurrences');
       await txn.delete('items');
       final batch = txn.batch();
       for (final item in seeds) {
@@ -66,11 +84,16 @@ class RoutineRepository {
 
   Future<void> insertItem(RoutineItem item) async {
     final db = await dbHelper.database;
-    await db.insert(
-      'items',
-      _routineItemToMap(item),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    final values = _routineItemToMap(item);
+    await db.transaction((txn) async {
+      final updated = await txn.update(
+        'items',
+        values,
+        where: 'id = ?',
+        whereArgs: [item.id],
+      );
+      if (updated == 0) await txn.insert('items', values);
+    });
   }
 
   Future<RoutineItem?> getItemById(String id) async {
@@ -82,6 +105,55 @@ class RoutineRepository {
       limit: 1,
     );
     return maps.isEmpty ? null : _mapToRoutineItem(maps.first);
+  }
+
+  Future<List<RoutineOccurrence>> getAllOccurrences() async {
+    final db = await dbHelper.database;
+    final maps = await db.query(
+      'item_occurrences',
+      orderBy: 'occurrence_date ASC',
+    );
+    return maps.map(_mapToOccurrence).toList();
+  }
+
+  Future<RoutineOccurrence?> getOccurrence(
+    String itemId,
+    String occurrenceDate,
+  ) async {
+    final db = await dbHelper.database;
+    final maps = await db.query(
+      'item_occurrences',
+      where: 'item_id = ? AND occurrence_date = ?',
+      whereArgs: [itemId, occurrenceDate],
+      limit: 1,
+    );
+    return maps.isEmpty ? null : _mapToOccurrence(maps.first);
+  }
+
+  Future<void> setOccurrenceCompletion({
+    required String itemId,
+    required String occurrenceDate,
+    required bool isCompleted,
+    DateTime? eventTime,
+  }) async {
+    final db = await dbHelper.database;
+    if (!isCompleted) {
+      await db.delete(
+        'item_occurrences',
+        where: 'item_id = ? AND occurrence_date = ?',
+        whereArgs: [itemId, occurrenceDate],
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    await db.insert('item_occurrences', {
+      'item_id': itemId,
+      'occurrence_date': occurrenceDate,
+      'is_completed': 1,
+      'event_timestamp': (eventTime ?? now).toIso8601String(),
+      'recorded_at_timestamp': now.toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> updateItemCompletion(String id, bool isCompleted) async {
@@ -96,7 +168,24 @@ class RoutineRepository {
 
   Future<void> deleteItem(String id) async {
     final db = await dbHelper.database;
-    await db.delete('items', where: 'id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      await txn.delete(
+        'item_occurrences',
+        where: 'item_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('items', where: 'id = ?', whereArgs: [id]);
+    });
+  }
+
+  RoutineOccurrence _mapToOccurrence(Map<String, dynamic> map) {
+    return RoutineOccurrence(
+      itemId: map['item_id'].toString(),
+      occurrenceDate: map['occurrence_date'].toString(),
+      isCompleted: map['is_completed'] == 1 || map['is_completed'] == true,
+      eventTimestamp: map['event_timestamp']?.toString(),
+      recordedAtTimestamp: map['recorded_at_timestamp'].toString(),
+    );
   }
 
   RoutineItem _mapToRoutineItem(Map<String, dynamic> map) {
@@ -275,6 +364,20 @@ class RoutineRepository {
         unit: 'hours sleep',
       ),
     ];
+  }
+
+  bool _occursOnDate(RoutineItem item, DateTime date) {
+    final start = DateTime.tryParse(item.scheduledDate ?? '');
+    if (start == null) return false;
+    final target = DateTime(date.year, date.month, date.day);
+    final first = DateTime(start.year, start.month, start.day);
+    if (target.isBefore(first)) return false;
+    final difference = target.difference(first).inDays;
+    return switch (item.recurrenceRule) {
+      'daily' => true,
+      'weekly' => difference % 7 == 0,
+      _ => difference == 0,
+    };
   }
 
   int _compareItems(RoutineItem a, RoutineItem b) {

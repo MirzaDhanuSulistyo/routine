@@ -1,4 +1,5 @@
 import 'package:andura_ui/andura_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:routine/main.dart';
@@ -27,5 +28,52 @@ void main() {
 
     expect(find.text('Create Routine Item'), findsOneWidget);
     expect(find.text('Create Item'), findsOneWidget);
+  });
+
+  testWidgets('timeline item exposes edit and delete dialogs', (
+    WidgetTester tester,
+  ) async {
+    final today = DateTime.now();
+    final dateKey =
+        '${today.year.toString().padLeft(4, '0')}-'
+        '${today.month.toString().padLeft(2, '0')}-'
+        '${today.day.toString().padLeft(2, '0')}';
+    final item = RoutineItem(
+      id: 'editable',
+      title: 'Editable task',
+      itemType: 'task',
+      category: 'personal',
+      timeOfDay: 'morning',
+      scheduledTime: '09:00 AM',
+      scheduledDate: dateKey,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MainNavigationScreen(
+          themeMode: ThemeMode.dark,
+          onToggleTheme: () {},
+          initialItems: [item],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final actions = tester.widget<PopupMenuButton<String>>(
+      find.byType(PopupMenuButton<String>),
+    );
+    actions.onSelected!('edit');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Edit Routine Item'), findsOneWidget);
+    expect(find.text('Save Changes'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pump(const Duration(milliseconds: 300));
+    final refreshedActions = tester.widget<PopupMenuButton<String>>(
+      find.byType(PopupMenuButton<String>),
+    );
+    refreshedActions.onSelected!('delete');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Delete routine item?'), findsOneWidget);
+    expect(find.textContaining('stored data will be removed'), findsOneWidget);
   });
 }

@@ -56,6 +56,92 @@ void main() {
     },
   );
 
+  test(
+    'stores per-date completion history and cascades item deletion',
+    () async {
+      final suffix = DateTime.now().microsecondsSinceEpoch;
+      final helper = DatabaseHelper.withName('test_occurrences_$suffix.db');
+      final repository = RoutineRepository(dbHelper: helper);
+      await repository.resetToSeedItems(date: DateTime(2026, 7, 20));
+      final recurring = RoutineItem(
+        id: 'daily_water',
+        title: 'Water plants',
+        itemType: 'maintenance',
+        category: 'home',
+        timeOfDay: 'morning',
+        scheduledTime: '08:00 AM',
+        scheduledDate: '2026-07-20',
+        recurrenceRule: 'daily',
+      );
+      await repository.insertItem(recurring);
+
+      await repository.setOccurrenceCompletion(
+        itemId: recurring.id,
+        occurrenceDate: '2026-07-20',
+        isCompleted: true,
+        eventTime: DateTime(2026, 7, 20, 8, 5),
+      );
+      await repository.setOccurrenceCompletion(
+        itemId: recurring.id,
+        occurrenceDate: '2026-07-21',
+        isCompleted: true,
+      );
+      await repository.setOccurrenceCompletion(
+        itemId: recurring.id,
+        occurrenceDate: '2026-07-21',
+        isCompleted: false,
+      );
+
+      final occurrences = await repository.getAllOccurrences();
+      expect(
+        occurrences.where((entry) => entry.itemId == recurring.id),
+        hasLength(1),
+      );
+      expect(
+        (await repository.getOccurrence(
+          recurring.id,
+          '2026-07-20',
+        ))?.isCompleted,
+        isTrue,
+      );
+      expect(
+        await repository.getOccurrence(recurring.id, '2026-07-21'),
+        isNull,
+      );
+
+      await repository.insertItem(
+        recurring.copyWith(title: 'Water all plants'),
+      );
+      expect(
+        (await repository.getOccurrence(
+          recurring.id,
+          '2026-07-20',
+        ))?.isCompleted,
+        isTrue,
+      );
+      final firstDay = await repository.getItemsForDate(DateTime(2026, 7, 20));
+      final secondDay = await repository.getItemsForDate(DateTime(2026, 7, 21));
+      expect(
+        firstDay.firstWhere((item) => item.id == recurring.id).isCompleted,
+        isTrue,
+      );
+      expect(
+        secondDay.firstWhere((item) => item.id == recurring.id).isCompleted,
+        isFalse,
+      );
+
+      await repository.deleteItem(recurring.id);
+      expect(await repository.getItemById(recurring.id), isNull);
+      expect(
+        (await repository.getAllOccurrences()).where(
+          (entry) => entry.itemId == recurring.id,
+        ),
+        isEmpty,
+      );
+      await helper.close();
+    },
+  );
+
   test('named databases are isolated and restore replaces user data', () async {
     final suffix = DateTime.now().microsecondsSinceEpoch;
     final firstHelper = DatabaseHelper.withName('test_first_$suffix.db');

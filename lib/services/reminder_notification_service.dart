@@ -267,7 +267,21 @@ class ReminderNotificationService {
     final repository = RoutineRepository();
     switch (response.actionId) {
       case _doneAction:
-        await repository.updateItemCompletion(itemId, true);
+        final item = await repository.getItemById(itemId);
+        if (item == null) return;
+        if (item.recurrenceRule == 'none') {
+          await repository.updateItemCompletion(itemId, true);
+        } else {
+          final now = DateTime.now();
+          final occurrenceDate = occurrenceDateForAction(item, now: now);
+          await repository.setOccurrenceCompletion(
+            itemId: itemId,
+            occurrenceDate: occurrenceDate,
+            isCompleted: true,
+            eventTime: now,
+          );
+        }
+        if (!_responseController.isClosed) _responseController.add(response);
         break;
       case _snoozeAction:
         final item = await repository.getItemById(itemId);
@@ -295,6 +309,53 @@ class ReminderNotificationService {
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
   }
+
+  static String occurrenceDateForAction(RoutineItem item, {DateTime? now}) {
+    final current = now ?? DateTime.now();
+    if (item.recurrenceRule == 'none') {
+      return item.scheduledDate ?? _dateKey(current);
+    }
+
+    final start = DateTime.tryParse(item.scheduledDate ?? '');
+    final time = _parseTime(item.scheduledTime);
+    if (start == null || time == null) return _dateKey(current);
+
+    DateTime? closestOccurrence;
+    Duration? closestDistance;
+    for (var offset = -8; offset <= 8; offset++) {
+      final day = DateTime(current.year, current.month, current.day + offset);
+      final difference = day
+          .difference(DateTime(start.year, start.month, start.day))
+          .inDays;
+      if (difference < 0) continue;
+      final occurs =
+          item.recurrenceRule == 'daily' ||
+          (item.recurrenceRule == 'weekly' && difference % 7 == 0);
+      if (!occurs) continue;
+
+      final occurrence = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        time.$1,
+        time.$2,
+      );
+      final trigger = occurrence.subtract(
+        Duration(minutes: item.prepOffsetMinutes ?? 0),
+      );
+      final distance = trigger.difference(current).abs();
+      if (closestDistance == null || distance < closestDistance) {
+        closestDistance = distance;
+        closestOccurrence = occurrence;
+      }
+    }
+    return _dateKey(closestOccurrence ?? current);
+  }
+
+  static String _dateKey(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 
   static (int, int)? _parseTime(String value) {
     final match = RegExp(

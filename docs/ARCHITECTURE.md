@@ -38,7 +38,8 @@ On data change, `Evaluate7DayPatternsUseCase` triggers in background to update `
 
 ## Domain model
 
-- `RoutineItem`: Domain entity representing scheduled tasks, reminders, prep offsets, or recorded observations.
+- `RoutineItem`: Domain entity representing scheduled tasks, reminders, prep offsets, recurrence, or recorded observations.
+- `RoutineOccurrence`: Per-date completion record for a recurring item, including event and recorded timestamps.
 - `EventTimestamp`: Business value object tracking `scheduled_time`, `event_actual_time`, and `recorded_at_time`.
 - `AnomalyPattern`: Entity capturing detected timing shifts (>30m delay), repeated notes (>=3 occurrences), or candidate co-occurrences.
 - `TopicBriefing`: Entity containing 3 finite stories fetched for scheduled morning/evening updates.
@@ -46,8 +47,8 @@ On data change, `Evaluate7DayPatternsUseCase` triggers in background to update `
 ## Persistence and migrations
 
 - **Primary Store**: `sqflite` (SQLite database stored in app document directory).
-- **Tables**: `items`, `logs`, `patterns`, `settings`.
-- **Encryption**: Key-value settings and privacy preferences stored via `flutter_secure_storage`.
+- **Tables**: `items`, `item_occurrences`.
+- **Migrations**: Versioned SQLite migrations preserve item templates while adding recurrence and occurrence history.
 
 ## Platform integration
 
@@ -68,7 +69,7 @@ On data change, `Evaluate7DayPatternsUseCase` triggers in background to update `
 
 - **Unit**: Pure Dart domain rule engine, 7-day sliding window algorithms, lead-time calculations.
 - **UI/Component**: Widget tests verifying `AnduraTheme.forSystem('linear-app')` rendering in Light & Dark mode.
-- **Integration**: SQLite repository CRUD operations and migration tests.
+- **Integration**: SQLite repository CRUD, per-occurrence completion, cascading deletion, and migration tests.
 
 ## Dependencies and rationale
 
