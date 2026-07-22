@@ -332,8 +332,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => _TextEditingControllerOwner(
+        controllers: [titleController, notesController, prepController],
+        child: StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
           title: Text(
             existingItem == null ? 'Create Routine Item' : 'Edit Routine Item',
           ),
@@ -566,12 +568,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
-
-    titleController.dispose();
-    notesController.dispose();
-    prepController.dispose();
   }
 
   Future<void> _confirmDeleteItem(RoutineItem item) async {
@@ -630,7 +629,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         final noteController = TextEditingController();
         final numController = TextEditingController();
 
-        return StatefulBuilder(
+        return _TextEditingControllerOwner(
+          controllers: [noteController, numController],
+          child: StatefulBuilder(
           builder: (context, setSheetState) {
             return Padding(
               padding: EdgeInsets.only(
@@ -810,6 +811,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             );
           },
+          ),
         );
       },
     );
@@ -2005,4 +2007,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
     );
   }
+}
+
+/// Owns controllers used by a transient route and disposes them only after the
+/// route's widget subtree is unmounted. A route future completes when it is
+/// popped, before its exit animation has finished.
+class _TextEditingControllerOwner extends StatefulWidget {
+  const _TextEditingControllerOwner({
+    required this.controllers,
+    required this.child,
+  });
+
+  final List<TextEditingController> controllers;
+  final Widget child;
+
+  @override
+  State<_TextEditingControllerOwner> createState() =>
+      _TextEditingControllerOwnerState();
+}
+
+class _TextEditingControllerOwnerState
+    extends State<_TextEditingControllerOwner> {
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

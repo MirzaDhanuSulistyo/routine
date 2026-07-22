@@ -30,6 +30,30 @@ void main() {
     expect(find.text('Create Item'), findsOneWidget);
   });
 
+  testWidgets('item builder keeps controllers alive through exit animation', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MainNavigationScreen(
+          themeMode: ThemeMode.dark,
+          onToggleTheme: () {},
+          initialItems: const [],
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Create routine item'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+
+    // The dialog route still builds while its exit animation is running.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(tester.takeException(), isNull);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('timeline item exposes edit and delete dialogs', (
     WidgetTester tester,
   ) async {
