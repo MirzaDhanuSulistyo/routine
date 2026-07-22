@@ -4,8 +4,8 @@ packages:
   andura_ui:
     dependency: "direct main"
     description:
-      path: "/Users/olseraios/code/andura-ui/packages/flutter"
-      relative: false
+      path: "../andura-ui/packages/flutter"
+      relative: true
     source: path
     version: "0.3.0"
   args:

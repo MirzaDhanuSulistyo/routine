@@ -1,86 +1,73 @@
 # Routine — Delivery Roadmap
 
-**Status:** Awaiting approval  
-**Last updated:** 2026-07-20
+**Status:** Active
 
-## Delivery principles
+**Delivery principle:** complete independently testable vertical slices; do not count demo data as a production integration.
 
-- Deliver independently testable vertical slices.
-- Preserve local-first privacy and 3-Layer Model principles.
-- Do not treat mock data as a completed integration.
+## Phase 1 — Local persistence and daily timeline
 
-## Phase 1 — Local SQLite Persistence & Timeline Engine
+**Status:** substantially complete
 
-**Status:** not-started
+Delivered:
+- SQLite item persistence and migration support
+- Daily timeline and chronological time sorting
+- Past/future date navigation
+- Flexible item creation
+- Fast logs with separate event and recorded timestamps
+- Completion updates and functional seed restore
 
-### Outcome
-A user can view daily scheduled items, log fast observations with dual timestamps (`event_time`, `recorded_at`), mark items complete, and persist changes across app restarts.
+Remaining:
+- Edit/delete interactions
+- Recurring schedule model
+- Timeline search and filters
 
-### Included
-- PRD requirements: `REQ-F1` (3-Layer Model), `REQ-F2` (Dual Timestamping), `REQ-F4` (Fast Logging)
-- Screens: Timeline View, Fast Event Logger Sheet
+## Phase 2 — Native reminders and finite briefings
 
-### Implementation
-- Setup `sqflite` database schema (`items`, `logs`).
-- Implement `RoutineRepository` SQLite data source.
-- Connect `_showFastLogSheet` to persist logs to local database.
+**Status:** partial
 
-### Validation
-```sh
-flutter analyze && flutter test
-```
-Target demonstration: iPhone 17 simulator log entry created, persisted in SQLite, and rendered after app restart.
+Delivered:
+- Preparation lead-time model
+- Finite briefing UI
+- Source selection and cached SQLite representation
 
----
+Remaining:
+- `flutter_local_notifications` integration
+- Done, Snooze, and Add Note notification actions
+- Permission-loss handling
+- Live RSS/API adapters, cache age, and offline/error states
 
-## Phase 2 — Lead-Time Reminders & Finite Topic Briefings
+## Phase 3 — Seven-day pattern engine
 
-**Status:** not-started
+**Status:** prototype
 
-### Outcome
-A user receives lead-time offset alerts prior to scheduled departure times (e.g. 10m engine prep) and views finite 3-story morning/evening briefings.
+Delivered:
+- Local schedule-delay calculation
+- Evidence cards and summary metrics
 
-### Included
-- PRD requirements: `REQ-F3` (Lead-Time Buffer Engine), `REQ-F6` (Finite Scheduled Briefings)
-- Screens: Timeline View, Briefing Modal Dialog
+Remaining:
+- Sliding seven-day query window
+- Repeated observation rules
+- Recurring timing-shift thresholds
+- Candidate co-occurrence rules
+- Deterministic fixtures covering multiple days and cautious insight language
 
-### Implementation
-- Integrate `flutter_local_notifications` for lead-time reminders.
-- Build briefing parser for scheduled tech/market updates.
+## Phase 4 — Settings and release readiness
 
----
+**Status:** partial
 
-## Phase 3 — 7-Day Sliding Window Rule Engine & Pattern Report
+Delivered:
+- Light/dark theme control
+- Database status and seed restore
 
-**Status:** not-started
+Remaining:
+- Persisted user settings
+- Notification schedule controls
+- JSON export/import
+- Accessibility and performance validation
+- Android/iOS release configuration and end-to-end testing
 
-### Outcome
-Routine automatically analyzes 7 days of logs to detect timing shifts (>30m late clock-out), repeated notes (>=3 occurrences), and co-occurring events.
+## Phase 5 — Optional web dashboard
 
-### Included
-- PRD requirements: `REQ-F5` (7-Day Pattern & Anomaly Detection)
-- Screens: Pattern Report View
+**Status:** deferred
 
-### Implementation
-- Implement sliding 7-day rule engine algorithm.
-- Render detected anomaly cards with evidence snippets in Pattern Report screen.
-
----
-
-## Phase 4 — Topic Subscriptions & Settings Customization
-
-**Status:** not-started
-
-### Outcome
-User can customize briefing topics, configure notification schedules, toggle Light/Dark mode preferences, and export local data.
-
-### Included
-- PRD requirements: `REQ-F6`, `REQ-N1` (Local Storage & Data Portability)
-- Screens: Settings Screen
-
----
-
-## Approval
-
-- [ ] Architecture and phase order approved
-- Approved by/date: Awaiting user approval (Stage 6 Gate)
+The React app in `src/` remains a mock-data UI proof. Web persistence and feature parity should begin only after the Flutter core workflow is validated with real usage.

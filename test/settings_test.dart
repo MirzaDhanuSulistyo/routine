@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:routine/main.dart';
 
 void main() {
-  testWidgets('Settings screen renders theme switch and database controls', (WidgetTester tester) async {
+  testWidgets('Settings screen renders theme switch and database controls', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       StatefulBuilder(
         builder: (context, setState) {

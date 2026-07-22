@@ -3,6 +3,9 @@ import 'package:andura_ui/andura_ui.dart';
 import 'data/routine_repository.dart';
 import 'data/briefing_service.dart';
 import 'data/anomaly_engine.dart';
+import 'domain/routine_item.dart';
+
+export 'domain/routine_item.dart';
 
 void main() {
   runApp(const RoutineApp());
@@ -21,7 +24,9 @@ class _RoutineAppState extends State<RoutineApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      _themeMode = _themeMode == ThemeMode.dark
+          ? ThemeMode.light
+          : ThemeMode.dark;
     });
   }
 
@@ -41,42 +46,6 @@ class _RoutineAppState extends State<RoutineApp> {
       ),
     );
   }
-}
-
-class RoutineItem {
-  final String id;
-  final String title;
-  final String itemType; // reminder, task, maintenance, deadline, preparation, briefing, log
-  final String category; // work, family, home, finance, personal
-  final String timeOfDay; // morning, afternoon, evening
-  final String scheduledTime;
-  final String? eventTimestamp;
-  final String? recordedAtTimestamp;
-  bool isCompleted;
-  final String? notes;
-  final double? numericValue;
-  final String? unit;
-  final int? prepOffsetMinutes;
-  final List<String>? topicSources;
-  final List<Map<String, String>>? briefStories;
-
-  RoutineItem({
-    required this.id,
-    required this.title,
-    required this.itemType,
-    required this.category,
-    required this.timeOfDay,
-    required this.scheduledTime,
-    this.eventTimestamp,
-    this.recordedAtTimestamp,
-    this.isCompleted = false,
-    this.notes,
-    this.numericValue,
-    this.unit,
-    this.prepOffsetMinutes,
-    this.topicSources,
-    this.briefStories,
-  });
 }
 
 class MainNavigationScreen extends StatefulWidget {
@@ -99,7 +68,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _selectedIndex = widget.initialIndex;
-  final String _currentDate = 'Monday, Jul 20, 2026';
+  DateTime _selectedDate = DateTime.now();
   final RoutineRepository _repository = RoutineRepository();
   final BriefingService _briefingService = BriefingService();
   final AnomalyAnalyticsEngine _anomalyEngine = AnomalyAnalyticsEngine();
@@ -156,6 +125,272 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
   }
 
+  String _dateKey(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  String _formatDate(DateTime date) {
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  String _formatTime(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${time.period == DayPeriod.am ? 'AM' : 'PM'}';
+  }
+
+  String _formatTimestamp(String value) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    return '${_dateKey(parsed)} ${_formatTime(TimeOfDay.fromDateTime(parsed))}';
+  }
+
+  List<RoutineItem> get _selectedDateItems {
+    final items = _items
+        .where((item) => item.scheduledDate == _dateKey(_selectedDate))
+        .toList();
+    items.sort(
+      (a, b) => _scheduledTimeMinutes(
+        a.scheduledTime,
+      ).compareTo(_scheduledTimeMinutes(b.scheduledTime)),
+    );
+    return items;
+  }
+
+  int _scheduledTimeMinutes(String value) {
+    final match = RegExp(
+      r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
+      caseSensitive: false,
+    ).firstMatch(value.trim());
+    if (match == null) return 24 * 60;
+    var hour = int.parse(match.group(1)!);
+    final minute = int.parse(match.group(2)!);
+    if (hour == 12) hour = 0;
+    if (match.group(3)!.toUpperCase() == 'PM') hour += 12;
+    return hour * 60 + minute;
+  }
+
+  void _changeDate(int dayOffset) {
+    setState(() {
+      _selectedDate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day + dayOffset,
+      );
+    });
+  }
+
+  Future<void> _showItemBuilder() async {
+    final titleController = TextEditingController();
+    final notesController = TextEditingController();
+    final prepController = TextEditingController();
+    var itemType = 'task';
+    var category = 'personal';
+    var date = _selectedDate;
+    var time = TimeOfDay.now();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Create Routine Item'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnduraTextField(
+                  controller: titleController,
+                  labelText: 'Title',
+                  hintText: 'What should happen?',
+                ),
+                const SizedBox(height: 12),
+                AnduraSelect<String>(
+                  value: itemType,
+                  labelText: 'Item type',
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'reminder',
+                      child: Text('Reminder'),
+                    ),
+                    DropdownMenuItem(value: 'task', child: Text('Task')),
+                    DropdownMenuItem(
+                      value: 'maintenance',
+                      child: Text('Maintenance'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'deadline',
+                      child: Text('Deadline'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'preparation',
+                      child: Text('Preparation'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'briefing',
+                      child: Text('Topic Briefing'),
+                    ),
+                    DropdownMenuItem(value: 'log', child: Text('Log Prompt')),
+                    DropdownMenuItem(
+                      value: 'measurement',
+                      child: Text('Measurement'),
+                    ),
+                  ],
+                  onChanged: (value) => setDialogState(() => itemType = value!),
+                ),
+                const SizedBox(height: 12),
+                AnduraSelect<String>(
+                  value: category,
+                  labelText: 'Category',
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'personal',
+                      child: Text('Personal'),
+                    ),
+                    DropdownMenuItem(value: 'work', child: Text('Work')),
+                    DropdownMenuItem(value: 'family', child: Text('Family')),
+                    DropdownMenuItem(value: 'home', child: Text('Home')),
+                    DropdownMenuItem(value: 'finance', child: Text('Finance')),
+                  ],
+                  onChanged: (value) => setDialogState(() => category = value!),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_today, size: 16),
+                        label: Text(
+                          _formatDate(date),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: () async {
+                          final selected = await showDatePicker(
+                            context: context,
+                            initialDate: date,
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 3650),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 3650),
+                            ),
+                          );
+                          if (selected != null) {
+                            setDialogState(() => date = selected);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.schedule, size: 16),
+                      label: Text(_formatTime(time)),
+                      onPressed: () async {
+                        final selected = await showTimePicker(
+                          context: context,
+                          initialTime: time,
+                        );
+                        if (selected != null) {
+                          setDialogState(() => time = selected);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                if (itemType == 'preparation') ...[
+                  const SizedBox(height: 12),
+                  AnduraTextField(
+                    controller: prepController,
+                    keyboardType: TextInputType.number,
+                    labelText: 'Lead time in minutes',
+                    hintText: '10',
+                  ),
+                ],
+                const SizedBox(height: 12),
+                AnduraTextArea(
+                  controller: notesController,
+                  labelText: 'Notes (optional)',
+                  minLines: 2,
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final title = titleController.text.trim();
+                if (title.isEmpty) return;
+                final newItem = RoutineItem(
+                  id: DateTime.now().microsecondsSinceEpoch.toString(),
+                  title: title,
+                  itemType: itemType,
+                  category: category,
+                  timeOfDay: time.hour < 12
+                      ? 'morning'
+                      : time.hour < 18
+                      ? 'afternoon'
+                      : 'evening',
+                  scheduledTime: _formatTime(time),
+                  scheduledDate: _dateKey(date),
+                  notes: notesController.text.trim().isEmpty
+                      ? null
+                      : notesController.text.trim(),
+                  prepOffsetMinutes: itemType == 'preparation'
+                      ? int.tryParse(prepController.text)
+                      : null,
+                  topicSources: itemType == 'briefing'
+                      ? ['TechCrunch', 'Bloomberg', 'HackerNews']
+                      : null,
+                  briefStories: itemType == 'briefing' ? [] : null,
+                );
+                await _repository.insertItem(newItem);
+                if (!mounted) return;
+                setState(() {
+                  _items.add(newItem);
+                  _selectedDate = date;
+                });
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              },
+              child: const Text('Create Item'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    titleController.dispose();
+    notesController.dispose();
+    prepController.dispose();
+  }
+
   void _showFastLogSheet() {
     showModalBottomSheet(
       context: context,
@@ -188,16 +423,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     children: [
                       Text(
                         'Fast Event & Observation Logger',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurface),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.close, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        icon: Icon(
+                          Icons.close,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('Target Date (Dual Timestamping)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+                  Text(
+                    'Target Date (Dual Timestamping)',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   AnduraChoiceRow<String>(
                     values: const ['Today', 'Yesterday', 'Tomorrow'],
@@ -209,7 +457,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   AnduraTextArea(
                     controller: noteController,
                     labelText: 'What happened or what did you observe?',
-                    hintText: 'e.g. Car engine hesitated, plant soil was dry...',
+                    hintText:
+                        'e.g. Car engine hesitated, plant soil was dry...',
                     minLines: 3,
                     maxLines: 4,
                   ),
@@ -230,13 +479,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           value: category,
                           labelText: 'Category',
                           items: const [
-                            DropdownMenuItem(value: 'personal', child: Text('Personal')),
-                            DropdownMenuItem(value: 'work', child: Text('Work')),
-                            DropdownMenuItem(value: 'family', child: Text('Family')),
-                            DropdownMenuItem(value: 'home', child: Text('Home')),
-                            DropdownMenuItem(value: 'finance', child: Text('Finance')),
+                            DropdownMenuItem(
+                              value: 'personal',
+                              child: Text('Personal'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'work',
+                              child: Text('Work'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'family',
+                              child: Text('Family'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'home',
+                              child: Text('Home'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'finance',
+                              child: Text('Finance'),
+                            ),
                           ],
-                          onChanged: (val) => setSheetState(() => category = val!),
+                          onChanged: (val) =>
+                              setSheetState(() => category = val!),
                         ),
                       ),
                     ],
@@ -249,36 +514,73 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF38BDF8),
                         foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: () async {
-                        if (noteController.text.isNotEmpty || numController.text.isNotEmpty) {
+                        if (noteController.text.isNotEmpty ||
+                            numController.text.isNotEmpty) {
+                          final now = DateTime.now();
+                          final dayOffset = dateMode == 'Yesterday'
+                              ? -1
+                              : dateMode == 'Tomorrow'
+                              ? 1
+                              : 0;
+                          final eventDate = DateTime(
+                            now.year,
+                            now.month,
+                            now.day + dayOffset,
+                            now.hour,
+                            now.minute,
+                          );
                           final newItem = RoutineItem(
-                            id: DateTime.now().millisecondsSinceEpoch.toString(),
+                            id: DateTime.now().microsecondsSinceEpoch
+                                .toString(),
                             title: noteController.text.isNotEmpty
                                 ? noteController.text.split('\n').first
                                 : 'Quick Observation Log',
                             itemType: 'log',
                             category: category,
-                            timeOfDay: 'evening',
-                            scheduledTime: 'Fast Logged',
+                            timeOfDay: eventDate.hour < 12
+                                ? 'morning'
+                                : eventDate.hour < 18
+                                ? 'afternoon'
+                                : 'evening',
+                            scheduledTime: _formatTime(
+                              TimeOfDay.fromDateTime(eventDate),
+                            ),
+                            scheduledDate: _dateKey(eventDate),
                             isCompleted: true,
-                            eventTimestamp: '$dateMode 09:00 AM',
-                            recordedAtTimestamp: 'Today 09:35 AM',
-                            notes: noteController.text.isNotEmpty ? noteController.text : null,
+                            eventTimestamp: eventDate.toIso8601String(),
+                            recordedAtTimestamp: now.toIso8601String(),
+                            notes: noteController.text.isNotEmpty
+                                ? noteController.text
+                                : null,
                             numericValue: double.tryParse(numController.text),
-                            unit: numController.text.isNotEmpty ? 'units' : null,
+                            unit: numController.text.isNotEmpty
+                                ? 'units'
+                                : null,
                           );
-                          setState(() {
-                            _items.insert(0, newItem);
-                          });
                           await _repository.insertItem(newItem);
+                          if (mounted) {
+                            setState(() {
+                              _items.add(newItem);
+                              _selectedDate = eventDate;
+                            });
+                          }
                         }
                         if (context.mounted) Navigator.pop(context);
                       },
-                    child: const Text('Save Log Entry', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      child: const Text(
+                        'Save Log Entry',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
                 ],
               ),
             );
@@ -290,7 +592,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   void _showBriefingModal(RoutineItem item) {
     final availableSources = _briefingService.availableSources;
-    List<String> selectedSources = List<String>.from(item.topicSources ?? ['TechCrunch', 'Bloomberg', 'HackerNews']);
+    List<String> selectedSources = List<String>.from(
+      item.topicSources ?? ['TechCrunch', 'Bloomberg', 'HackerNews'],
+    );
     bool isFetching = false;
 
     showDialog(
@@ -299,22 +603,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerLow,
               title: Row(
                 children: [
                   Expanded(
                     child: Text(
                       item.title,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 17, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.tune, color: Theme.of(context).colorScheme.primary, size: 20),
+                    icon: Icon(
+                      Icons.tune,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
+                    ),
                     tooltip: 'Filter Sources',
                     onPressed: () {
                       showModalBottomSheet(
                         context: context,
-                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLow,
                         builder: (sheetCtx) {
                           return StatefulBuilder(
                             builder: (sheetStateCtx, setSheetState) {
@@ -324,13 +640,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Select Briefing Sources', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold)),
+                                    Text(
+                                      'Select Briefing Sources',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                     const SizedBox(height: 12),
                                     Wrap(
                                       spacing: 8,
                                       runSpacing: 8,
                                       children: availableSources.map((src) {
-                                        final isSelected = selectedSources.contains(src);
+                                        final isSelected = selectedSources
+                                            .contains(src);
                                         return FilterChip(
                                           label: Text(src),
                                           selected: isSelected,
@@ -338,7 +664,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                             setSheetState(() {
                                               if (val) {
                                                 selectedSources.add(src);
-                                              } else if (selectedSources.length > 1) {
+                                              } else if (selectedSources
+                                                      .length >
+                                                  1) {
                                                 selectedSources.remove(src);
                                               }
                                             });
@@ -351,8 +679,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                     SizedBox(
                                       width: double.infinity,
                                       child: ElevatedButton(
-                                        onPressed: () => Navigator.pop(sheetCtx),
-                                        child: const Text('Apply Source Selection'),
+                                        onPressed: () =>
+                                            Navigator.pop(sheetCtx),
+                                        child: const Text(
+                                          'Apply Source Selection',
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -371,7 +702,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Active Sources:', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    Text(
+                      'Active Sources:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -379,8 +716,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       children: selectedSources.map((src) {
                         return Chip(
                           visualDensity: VisualDensity.compact,
-                          label: Text(src, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSecondaryContainer)),
-                          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                          label: Text(
+                            src,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSecondaryContainer,
+                            ),
+                          ),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.secondaryContainer,
                         );
                       }).toList(),
                     ),
@@ -388,17 +735,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Curated Stories (${(item.briefStories ?? []).length})', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text(
+                          'Curated Stories (${(item.briefStories ?? []).length})',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         if (isFetching)
-                          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         else
                           TextButton.icon(
-                            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
                             icon: const Icon(Icons.refresh, size: 14),
-                            label: const Text('Refresh Feed', style: TextStyle(fontSize: 12)),
+                            label: const Text(
+                              'Refresh Feed',
+                              style: TextStyle(fontSize: 12),
+                            ),
                             onPressed: () async {
                               setDialogState(() => isFetching = true);
-                              final newStories = await _briefingService.fetchBriefingStories(selectedSources: selectedSources);
+                              final newStories = await _briefingService
+                                  .fetchBriefingStories(
+                                    selectedSources: selectedSources,
+                                  );
                               final updatedItem = RoutineItem(
                                 id: item.id,
                                 title: item.title,
@@ -406,6 +775,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                 category: item.category,
                                 timeOfDay: item.timeOfDay,
                                 scheduledTime: item.scheduledTime,
+                                scheduledDate: item.scheduledDate,
                                 eventTimestamp: item.eventTimestamp,
                                 recordedAtTimestamp: item.recordedAtTimestamp,
                                 isCompleted: item.isCompleted,
@@ -414,12 +784,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                 unit: item.unit,
                                 prepOffsetMinutes: item.prepOffsetMinutes,
                                 topicSources: selectedSources,
-                                briefStories: newStories.map((s) => s.toMap()).toList(),
+                                briefStories: newStories
+                                    .map((s) => s.toMap())
+                                    .toList(),
                               );
                               await _repository.insertItem(updatedItem);
                               if (mounted) {
                                 setState(() {
-                                  final idx = _items.indexWhere((i) => i.id == item.id);
+                                  final idx = _items.indexWhere(
+                                    (i) => i.id == item.id,
+                                  );
                                   if (idx != -1) _items[idx] = updatedItem;
                                 });
                               }
@@ -437,9 +811,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHigh,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,32 +826,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.primaryContainer,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     story['source'] ?? '',
-                                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer, fontSize: 10, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 if (story['category'] != null)
                                   Text(
                                     story['category']!,
-                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10),
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                      fontSize: 10,
+                                    ),
                                   ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
                               story['headline'] ?? '',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 13),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               story['summary'] ?? '',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12, height: 1.3),
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                fontSize: 12,
+                                height: 1.3,
+                              ),
                             ),
                           ],
                         ),
@@ -488,13 +892,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   child: const Text('Close'),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF38BDF8),
+                  ),
                   onPressed: () async {
                     setState(() => item.isCompleted = true);
                     await _repository.updateItemCompletion(item.id, true);
                     if (dialogCtx.mounted) Navigator.pop(dialogCtx);
                   },
-                  child: const Text('✓ Mark Briefing Complete', style: TextStyle(color: Colors.black)),
+                  child: const Text(
+                    '✓ Mark Briefing Complete',
+                    style: TextStyle(color: Colors.black),
+                  ),
                 ),
               ],
             );
@@ -504,9 +913,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  Widget _buildTimelineSection(String title, String timeOfDay, IconData sectionIcon) {
-    final sectionItems = _items
-        .where((i) => i.timeOfDay.toLowerCase().trim() == timeOfDay.toLowerCase().trim())
+  Widget _buildTimelineSection(
+    String title,
+    String timeOfDay,
+    IconData sectionIcon,
+  ) {
+    final sectionItems = _selectedDateItems
+        .where(
+          (i) =>
+              i.timeOfDay.toLowerCase().trim() ==
+              timeOfDay.toLowerCase().trim(),
+        )
         .toList();
 
     return Column(
@@ -533,7 +950,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         if (sectionItems.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8.0),
-            child: Text('No items scheduled', style: TextStyle(color: Colors.white38, fontSize: 13)),
+            child: Text(
+              'No items scheduled',
+              style: TextStyle(color: Colors.white38, fontSize: 13),
+            ),
           )
         else
           ...sectionItems.map((item) {
@@ -543,7 +963,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .5)),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: .5),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,7 +990,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            decoration: item.isCompleted ? TextDecoration.lineThrough : null,
+                            decoration: item.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                         ),
                       ),
@@ -583,14 +1009,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       else
                         IconButton(
                           icon: Icon(
-                            item.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                            color: item.isCompleted ? const Color(0xFF34D399) : Colors.grey,
+                            item.isCompleted
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
+                            color: item.isCompleted
+                                ? const Color(0xFF34D399)
+                                : Colors.grey,
                           ),
                           onPressed: () {
                             setState(() {
                               item.isCompleted = !item.isCompleted;
                             });
-                            _repository.updateItemCompletion(item.id, item.isCompleted);
+                            _repository.updateItemCompletion(
+                              item.id,
+                              item.isCompleted,
+                            );
                           },
                         ),
                     ],
@@ -598,17 +1031,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.access_time, size: 12, color: Colors.grey),
+                      const Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
-                      Text(item.scheduledTime, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text(
+                        item.scheduledTime,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Text('• ${item.itemType.toUpperCase()}', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      Text(
+                        '• ${item.itemType.toUpperCase()}',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
                   if (item.prepOffsetMinutes != null) ...[
                     const SizedBox(height: 6),
                     AnduraBadge(
-                      label: 'Prep offset: ${item.prepOffsetMinutes}m lead time',
+                      label:
+                          'Prep offset: ${item.prepOffsetMinutes}m lead time',
                       color: Theme.of(context).colorScheme.primaryContainer,
                     ),
                   ],
@@ -617,18 +1067,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(6),
-                        border: const Border(left: BorderSide(color: Color(0xFF38BDF8), width: 3)),
+                        border: const Border(
+                          left: BorderSide(color: Color(0xFF38BDF8), width: 3),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.edit_note, size: 14, color: Color(0xFF38BDF8)),
+                          const Icon(
+                            Icons.edit_note,
+                            size: 14,
+                            color: Color(0xFF38BDF8),
+                          ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               'Log: ${item.notes}',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
@@ -644,11 +1105,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.schedule, size: 10, color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7)),
+                            Icon(
+                              Icons.schedule,
+                              size: 10,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant
+                                  .withValues(alpha: .7),
+                            ),
                             const SizedBox(width: 4),
                             Text(
-                              'Event: ${item.eventTimestamp}',
-                              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7), fontSize: 10),
+                              'Event: ${_formatTimestamp(item.eventTimestamp!)}',
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant
+                                    .withValues(alpha: .7),
+                                fontSize: 10,
+                              ),
                             ),
                           ],
                         ),
@@ -656,11 +1130,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.save, size: 10, color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7)),
+                              Icon(
+                                Icons.save,
+                                size: 10,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant
+                                    .withValues(alpha: .7),
+                              ),
                               const SizedBox(width: 4),
                               Text(
-                                'Recorded: ${item.recordedAtTimestamp}',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .7), fontSize: 10),
+                                'Recorded: ${_formatTimestamp(item.recordedAtTimestamp!)}',
+                                style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant
+                                      .withValues(alpha: .7),
+                                  fontSize: 10,
+                                ),
                               ),
                             ],
                           ),
@@ -692,12 +1179,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.auto_awesome,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     report.primaryAnomalyDescription,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -706,17 +1199,33 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              _buildStatCard('Tracked Items', '${report.totalEvents}', 'Active routine logs'),
+              _buildStatCard(
+                'Tracked Items',
+                '${report.totalEvents}',
+                'Active routine logs',
+              ),
               const SizedBox(width: 10),
-              _buildStatCard('Anomalies', '${report.anomaliesDetected}', 'Timing shifts'),
+              _buildStatCard(
+                'Anomalies',
+                '${report.anomaliesDetected}',
+                'Timing shifts',
+              ),
               const SizedBox(width: 10),
-              _buildStatCard('Avg Delay', '${report.averageDelayMinutes}m', 'Schedule variance'),
+              _buildStatCard(
+                'Avg Delay',
+                '${report.averageDelayMinutes}m',
+                'Schedule variance',
+              ),
             ],
           ),
           const SizedBox(height: 24),
           Text(
             'Detected Patterns & Anomalies',
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           ...report.detectedPatterns.map((pat) {
@@ -739,23 +1248,53 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              title,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 4),
-            Text(val, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              val,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text(sub, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              sub,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontSize: 9,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAnomalyCard(String title, String desc, String evidence, Color accentColor) {
+  Widget _buildAnomalyCard(
+    String title,
+    String desc,
+    String evidence,
+    Color accentColor,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -767,9 +1306,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(
+            title,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(desc, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+          Text(
+            desc,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(8),
@@ -779,12 +1331,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.search, size: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                Icon(
+                  Icons.search,
+                  size: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Evidence: $evidence',
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ],
@@ -801,14 +1360,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Settings & System Status', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+            'Settings & System Status',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,7 +1384,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Appearance Theme', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
+                    Text(
+                      'Appearance Theme',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
                     Switch(
                       value: widget.themeMode == ThemeMode.dark,
                       onChanged: (_) => widget.onToggleTheme(),
@@ -825,7 +1400,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 Text(
                   'Current Mode: ${widget.themeMode == ThemeMode.dark ? 'Linear Dark' : 'Linear Light'}',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -836,27 +1414,46 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Local SQLite Database', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  'Local SQLite Database',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text('Storage File: routine_v4.db (${_items.length} active records)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                Text(
+                  'Storage File: routine_v4.db (${_items.length} active records)',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.restore, size: 16),
                   label: const Text('Restore Default Seed Routine Data'),
                   onPressed: () async {
-                    await _repository.seedDataIfEmpty();
+                    await _repository.resetToSeedItems(date: _selectedDate);
                     final items = await _repository.getAllItems();
                     if (mounted) {
                       setState(() {
                         _items = items;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('SQLite routine database reset to default seed items.')),
+                        const SnackBar(
+                          content: Text(
+                            'Routine data restored to the default items.',
+                          ),
+                        ),
                       );
                     }
                   },
@@ -870,14 +1467,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Local-First Architecture', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  'Local-First Architecture',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text('Version 1.0.0 • Zero Cloud Dependency • 100% On-Device Analytics', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
+                Text(
+                  'Version 1.0.0 • Zero Cloud Dependency • 100% On-Device Analytics',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
@@ -904,96 +1516,144 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.bolt, color: Theme.of(context).colorScheme.primary, size: 18),
+                Icon(
+                  Icons.bolt,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 18,
+                ),
               ],
             ),
             Text(
               'Remember it. Record it. Notice the pattern.',
-              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            tooltip: widget.themeMode == ThemeMode.dark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            tooltip: widget.themeMode == ThemeMode.dark
+                ? 'Switch to Light Mode'
+                : 'Switch to Dark Mode',
             icon: Icon(
-              widget.themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
+              widget.themeMode == ThemeMode.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
               color: Theme.of(context).colorScheme.primary,
             ),
             onPressed: widget.onToggleTheme,
           ),
           IconButton(
-            icon: Icon(Icons.add_task, color: Theme.of(context).colorScheme.primary),
-            onPressed: _showFastLogSheet,
+            tooltip: 'Create routine item',
+            icon: Icon(
+              Icons.add_task,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            onPressed: _showItemBuilder,
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _selectedIndex == 0
-              ? SingleChildScrollView(
+          ? SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      IconButton(
+                        tooltip: 'Previous day',
+                        onPressed: () => _changeDate(-1),
+                        icon: const Icon(Icons.chevron_left),
+                      ),
                       Expanded(
-                        child: Row(
-                          children: [
-                            const Icon(Icons.calendar_today, size: 14, color: Color(0xFF38BDF8)),
-                            const SizedBox(width: 6),
-                            Text(
-                              _currentDate,
-                              style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 14),
-                              overflow: TextOverflow.ellipsis,
+                        child: TextButton.icon(
+                          icon: const Icon(Icons.calendar_today, size: 14),
+                          label: Text(
+                            _formatDate(_selectedDate),
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
-                          ],
+                          ),
+                          onPressed: () async {
+                            final selected = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 3650),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 3650),
+                              ),
+                            );
+                            if (selected != null && mounted) {
+                              setState(() => _selectedDate = selected);
+                            }
+                          },
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 115,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF38BDF8),
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          ),
-                          onPressed: _showFastLogSheet,
-                          icon: const Icon(Icons.edit_note, size: 16),
-                          label: const Text('+ Fast Log', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        ),
+                      IconButton(
+                        tooltip: 'Next day',
+                        onPressed: () => _changeDate(1),
+                        icon: const Icon(Icons.chevron_right),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildTimelineSection('MORNING (05:00 - 12:00)', 'morning', Icons.wb_twilight),
+                  _buildTimelineSection(
+                    'MORNING (05:00 - 12:00)',
+                    'morning',
+                    Icons.wb_twilight,
+                  ),
                   const SizedBox(height: 12),
-                  _buildTimelineSection('AFTERNOON (12:00 - 18:00)', 'afternoon', Icons.wb_sunny),
+                  _buildTimelineSection(
+                    'AFTERNOON (12:00 - 18:00)',
+                    'afternoon',
+                    Icons.wb_sunny,
+                  ),
                   const SizedBox(height: 12),
-                  _buildTimelineSection('EVENING (18:00 - 24:00)', 'evening', Icons.nights_stay),
+                  _buildTimelineSection(
+                    'EVENING (18:00 - 24:00)',
+                    'evening',
+                    Icons.nights_stay,
+                  ),
                 ],
               ),
             )
           : _selectedIndex == 1
-              ? _buildPatternReportView()
-              : _buildSettingsView(),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF38BDF8),
-        foregroundColor: Colors.black,
-        onPressed: _showFastLogSheet,
-        icon: const Icon(Icons.flash_on),
-        label: const Text('Quick Log'),
-      ),
+          ? _buildPatternReportView()
+          : _buildSettingsView(),
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF38BDF8),
+              foregroundColor: Colors.black,
+              onPressed: _showFastLogSheet,
+              icon: const Icon(Icons.flash_on),
+              label: const Text('Quick Log'),
+            )
+          : null,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.timeline), label: 'Timeline'),
-          BottomNavigationBarItem(icon: Icon(Icons.insights), label: 'Pattern Report'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.timeline),
+            label: 'Timeline',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insights),
+            label: 'Pattern Report',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
         ],
       ),
     );

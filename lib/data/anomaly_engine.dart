@@ -1,4 +1,4 @@
-import '../main.dart';
+import '../domain/routine_item.dart';
 
 class AnomalyReport {
   final int totalEvents;
@@ -38,7 +38,9 @@ class AnomalyAnalyticsEngine {
             totalDelay += diff;
             if (diff >= 10) {
               anomalies++;
-              patterns.add('${item.title}: Delayed by $diff minutes on ${item.eventTimestamp}');
+              patterns.add(
+                '${item.title}: Delayed by $diff minutes on ${item.eventTimestamp}',
+              );
             }
           }
         }
@@ -53,7 +55,8 @@ class AnomalyAnalyticsEngine {
     }
 
     if (patterns.isNotEmpty) {
-      primaryDesc = 'Detected ${patterns.length} routine variance pattern(s) across work and commute schedules.';
+      primaryDesc =
+          'Detected ${patterns.length} routine variance pattern(s) across work and commute schedules.';
     }
 
     final avgDelay = total > 0 ? (totalDelay / total) : 0.0;
@@ -89,6 +92,9 @@ class AnomalyAnalyticsEngine {
   }
 
   int? _parseEventTimestampMinutes(String timestampStr) {
+    final parsed = DateTime.tryParse(timestampStr);
+    if (parsed != null) return parsed.hour * 60 + parsed.minute;
+
     try {
       final parts = timestampStr.trim().split(' ');
       if (parts.length < 3) return null;

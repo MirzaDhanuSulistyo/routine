@@ -13,7 +13,9 @@ void main() {
 
   test('BriefingService filters stories by selected sources', () async {
     final service = BriefingService();
-    final stories = await service.fetchBriefingStories(selectedSources: ['TechCrunch']);
+    final stories = await service.fetchBriefingStories(
+      selectedSources: ['TechCrunch'],
+    );
 
     expect(stories.every((s) => s.source == 'TechCrunch'), isTrue);
   });

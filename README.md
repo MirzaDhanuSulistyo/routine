@@ -1,17 +1,53 @@
-# routine
+# Routine
 
-A new Flutter project.
+Routine is a local-first personal life operations assistant for planning expected events, recording what actually happened, and identifying explainable patterns over time.
 
-## Getting Started
+> Remember it. Record it. Notice the pattern.
 
-This project is a starting point for a Flutter application.
+## Current capabilities
 
-A few resources to get you started if this is your first Flutter project:
+- Daily timeline grouped into morning, afternoon, and evening
+- Past and future date navigation
+- Flexible item creation across reminders, tasks, maintenance, deadlines, preparation, briefings, logs, and measurements
+- Fast observation and numeric logging with separate event and recorded timestamps
+- Local SQLite persistence
+- Finite, source-filtered briefing cards using demo content
+- Basic on-device schedule variance reporting
+- Linear light and dark themes
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Run the Flutter app
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Routine currently depends on the sibling Andura UI repository:
+
+```text
+parent/
+├── andura-ui/
+└── routine/
+```
+
+Then run:
+
+```sh
+flutter pub get
+flutter run
+```
+
+## Validate
+
+```sh
+flutter analyze
+flutter test
+```
+
+## Project structure
+
+- `lib/domain/` — application entities
+- `lib/data/` — SQLite repository, briefing service, and analytics engine
+- `lib/main.dart` — current Flutter presentation layer
+- `test/` — repository, service, analytics, and widget tests
+- `src/` — earlier React UI proof; it is not the production implementation
+- `docs/` — product, architecture, screen, and delivery documentation
+
+## Production gaps
+
+The app remains a beta. Local notifications, recurrence, live briefing feeds, robust seven-day correlation analysis, data export, and broader integration testing are still planned.

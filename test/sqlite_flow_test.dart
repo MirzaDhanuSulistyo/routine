@@ -11,7 +11,9 @@ void main() {
   });
 
   test('Phase 1 SQLite persistence — seed, insert, query, update', () async {
-    final repo = RoutineRepository(dbHelper: DatabaseHelper.withName('test_flow.db'));
+    final repo = RoutineRepository(
+      dbHelper: DatabaseHelper.withName('test_flow.db'),
+    );
 
     // 1. Load seed items
     final items = await repo.getAllItems();
