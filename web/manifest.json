@@ -1,6 +1,6 @@
 {
-    "name": "routine",
-    "short_name": "routine",
+    "name": "Routine",
+    "short_name": "Routine",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

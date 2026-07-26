@@ -1,4 +1,4 @@
-package com.routine.app.routine
+package io.andura.routine
 
 import io.flutter.embedding.android.FlutterActivity
 

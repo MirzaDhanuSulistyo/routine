@@ -45,7 +45,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Create routine item'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancel'));
+    await tester.pageBack();
 
     // The dialog route still builds while its exit animation is running.
     await tester.pump();
@@ -82,20 +82,31 @@ void main() {
     );
     await tester.pump();
 
-    final actions = tester.widget<PopupMenuButton<String>>(
-      find.byType(PopupMenuButton<String>),
+    final actions = tester.widget<IconButton>(
+      find.ancestor(
+        of: find.byIcon(Icons.more_vert),
+        matching: find.byType(IconButton),
+      ),
     );
-    actions.onSelected!('edit');
+    actions.onPressed!();
+    await tester.pumpAndSettle();
+    expect(find.text('Edit'), findsOneWidget);
+    await tester.tap(find.text('Edit'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Edit Routine Item'), findsOneWidget);
     expect(find.text('Save Changes'), findsOneWidget);
 
-    await tester.tap(find.text('Cancel'));
+    await tester.pageBack();
     await tester.pump(const Duration(milliseconds: 300));
-    final refreshedActions = tester.widget<PopupMenuButton<String>>(
-      find.byType(PopupMenuButton<String>),
+    final refreshedActions = tester.widget<IconButton>(
+      find.ancestor(
+        of: find.byIcon(Icons.more_vert),
+        matching: find.byType(IconButton),
+      ),
     );
-    refreshedActions.onSelected!('delete');
+    refreshedActions.onPressed!();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Delete routine item?'), findsOneWidget);
     expect(find.textContaining('stored data will be removed'), findsOneWidget);

@@ -335,239 +335,300 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       builder: (dialogContext) => _TextEditingControllerOwner(
         controllers: [titleController, notesController, prepController],
         child: StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            existingItem == null ? 'Create Routine Item' : 'Edit Routine Item',
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnduraTextField(
-                  controller: titleController,
-                  labelText: 'Title',
-                  hintText: 'What should happen?',
+          builder: (context, setDialogState) => Dialog.fullscreen(
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text(
+                  existingItem == null
+                      ? 'Create Routine Item'
+                      : 'Edit Routine Item',
                 ),
-                const SizedBox(height: 12),
-                AnduraSelect<String>(
-                  value: itemType,
-                  labelText: 'Item type',
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'reminder',
-                      child: Text('Reminder'),
-                    ),
-                    DropdownMenuItem(value: 'task', child: Text('Task')),
-                    DropdownMenuItem(
-                      value: 'maintenance',
-                      child: Text('Maintenance'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'deadline',
-                      child: Text('Deadline'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'preparation',
-                      child: Text('Preparation'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'briefing',
-                      child: Text('Topic Briefing'),
-                    ),
-                    DropdownMenuItem(value: 'log', child: Text('Log Prompt')),
-                    DropdownMenuItem(
-                      value: 'measurement',
-                      child: Text('Measurement'),
-                    ),
-                  ],
-                  onChanged: (value) => setDialogState(() => itemType = value!),
-                ),
-                const SizedBox(height: 12),
-                AnduraSelect<String>(
-                  value: category,
-                  labelText: 'Category',
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'personal',
-                      child: Text('Personal'),
-                    ),
-                    DropdownMenuItem(value: 'work', child: Text('Work')),
-                    DropdownMenuItem(value: 'family', child: Text('Family')),
-                    DropdownMenuItem(value: 'home', child: Text('Home')),
-                    DropdownMenuItem(value: 'finance', child: Text('Finance')),
-                  ],
-                  onChanged: (value) => setDialogState(() => category = value!),
-                ),
-                const SizedBox(height: 12),
-                Row(
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.calendar_today, size: 16),
-                        label: Text(
-                          _formatDate(date),
-                          overflow: TextOverflow.ellipsis,
+                    AnduraTextField(
+                      controller: titleController,
+                      labelText: 'Title',
+                      hintText: 'What should happen?',
+                    ),
+                    const SizedBox(height: 12),
+                    AnduraSelect<String>(
+                      value: itemType,
+                      labelText: 'Item type',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'reminder',
+                          child: Text('Reminder'),
                         ),
-                        onPressed: () async {
-                          final selected = await showDatePicker(
-                            context: context,
-                            initialDate: date,
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 3650),
-                            ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 3650),
-                            ),
-                          );
-                          if (selected != null) {
-                            setDialogState(() => date = selected);
-                          }
-                        },
-                      ),
+                        DropdownMenuItem(value: 'task', child: Text('Task')),
+                        DropdownMenuItem(
+                          value: 'maintenance',
+                          child: Text('Maintenance'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'deadline',
+                          child: Text('Deadline'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'preparation',
+                          child: Text('Preparation'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'briefing',
+                          child: Text('Topic Briefing'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'log',
+                          child: Text('Log Prompt'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'measurement',
+                          child: Text('Measurement'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => itemType = value!),
                     ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.schedule, size: 16),
-                      label: Text(_formatTime(time)),
-                      onPressed: () async {
-                        final selected = await showTimePicker(
-                          context: context,
-                          initialTime: time,
+                    const SizedBox(height: 12),
+                    AnduraSelect<String>(
+                      value: category,
+                      labelText: 'Category',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'personal',
+                          child: Text('Personal'),
+                        ),
+                        DropdownMenuItem(value: 'work', child: Text('Work')),
+                        DropdownMenuItem(
+                          value: 'family',
+                          child: Text('Family'),
+                        ),
+                        DropdownMenuItem(value: 'home', child: Text('Home')),
+                        DropdownMenuItem(
+                          value: 'finance',
+                          child: Text('Finance'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => category = value!),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: Text(
+                              _formatDate(date),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onPressed: () async {
+                              final selected = await showDatePicker(
+                                context: context,
+                                initialDate: date,
+                                firstDate: DateTime.now().subtract(
+                                  const Duration(days: 3650),
+                                ),
+                                lastDate: DateTime.now().add(
+                                  const Duration(days: 3650),
+                                ),
+                              );
+                              if (selected != null) {
+                                setDialogState(() => date = selected);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.schedule, size: 16),
+                          label: Text(_formatTime(time)),
+                          onPressed: () async {
+                            final selected = await showTimePicker(
+                              context: context,
+                              initialTime: time,
+                            );
+                            if (selected != null) {
+                              setDialogState(() => time = selected);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    AnduraSelect<String>(
+                      value: recurrenceRule,
+                      labelText: 'Repeat',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'none',
+                          child: Text('Does not repeat'),
+                        ),
+                        DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                        DropdownMenuItem(
+                          value: 'weekly',
+                          child: Text('Weekly'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setDialogState(() => recurrenceRule = value!),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Notify me'),
+                      subtitle: const Text(
+                        'Done, Snooze 10m, and Add Note actions',
+                      ),
+                      value: notificationsEnabled,
+                      onChanged: (value) =>
+                          setDialogState(() => notificationsEnabled = value),
+                    ),
+                    if (itemType == 'preparation') ...[
+                      const SizedBox(height: 12),
+                      AnduraTextField(
+                        controller: prepController,
+                        keyboardType: TextInputType.number,
+                        labelText: 'Lead time in minutes',
+                        hintText: '10',
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    AnduraTextArea(
+                      controller: notesController,
+                      labelText: 'Notes (optional)',
+                      minLines: 2,
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
+              ),
+              bottomNavigationBar: SafeArea(
+                minimum: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final title = titleController.text.trim();
+                      if (title.isEmpty) return;
+                      var canNotify = notificationsEnabled;
+                      if (canNotify) {
+                        canNotify = await _reminders.requestPermissions();
+                      }
+                      final newItem = RoutineItem(
+                        id:
+                            existingItem?.id ??
+                            DateTime.now().microsecondsSinceEpoch.toString(),
+                        title: title,
+                        itemType: itemType,
+                        category: category,
+                        timeOfDay: time.hour < 12
+                            ? 'morning'
+                            : time.hour < 18
+                            ? 'afternoon'
+                            : 'evening',
+                        scheduledTime: _formatTime(time),
+                        scheduledDate: _dateKey(date),
+                        recurrenceRule: recurrenceRule,
+                        notificationsEnabled: canNotify,
+                        eventTimestamp: existingItem?.eventTimestamp,
+                        recordedAtTimestamp: existingItem?.recordedAtTimestamp,
+                        isCompleted: recurrenceRule == 'none'
+                            ? existingItem?.isCompleted ?? false
+                            : false,
+                        notes: notesController.text.trim().isEmpty
+                            ? null
+                            : notesController.text.trim(),
+                        prepOffsetMinutes: itemType == 'preparation'
+                            ? int.tryParse(prepController.text)
+                            : null,
+                        numericValue: existingItem?.numericValue,
+                        unit: existingItem?.unit,
+                        topicSources: itemType == 'briefing'
+                            ? existingItem?.topicSources ??
+                                  ['TechCrunch', 'Bloomberg', 'HackerNews']
+                            : null,
+                        briefStories: itemType == 'briefing'
+                            ? existingItem?.briefStories ?? []
+                            : null,
+                      );
+                      await _repository.insertItem(newItem);
+                      await _reminders.schedule(newItem);
+                      final pendingCount = await _reminders.pendingCount();
+                      if (!mounted) return;
+                      setState(() {
+                        _pendingReminderCount = pendingCount;
+                        final existingIndex = _items.indexWhere(
+                          (item) => item.id == newItem.id,
                         );
-                        if (selected != null) {
-                          setDialogState(() => time = selected);
+                        if (existingIndex == -1) {
+                          _items.add(newItem);
+                        } else {
+                          _items[existingIndex] = newItem;
                         }
-                      },
+                        _selectedDate = date;
+                      });
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                      if (notificationsEnabled && !canNotify && mounted) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Item created, but notification permission was not granted.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: Text(
+                      existingItem == null ? 'Create Item' : 'Save Changes',
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                AnduraSelect<String>(
-                  value: recurrenceRule,
-                  labelText: 'Repeat',
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'none',
-                      child: Text('Does not repeat'),
-                    ),
-                    DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                    DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                  ],
-                  onChanged: (value) =>
-                      setDialogState(() => recurrenceRule = value!),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Notify me'),
-                  subtitle: const Text(
-                    'Done, Snooze 10m, and Add Note actions',
                   ),
-                  value: notificationsEnabled,
-                  onChanged: (value) =>
-                      setDialogState(() => notificationsEnabled = value),
                 ),
-                if (itemType == 'preparation') ...[
-                  const SizedBox(height: 12),
-                  AnduraTextField(
-                    controller: prepController,
-                    keyboardType: TextInputType.number,
-                    labelText: 'Lead time in minutes',
-                    hintText: '10',
-                  ),
-                ],
-                const SizedBox(height: 12),
-                AnduraTextArea(
-                  controller: notesController,
-                  labelText: 'Notes (optional)',
-                  minLines: 2,
-                  maxLines: 3,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final title = titleController.text.trim();
-                if (title.isEmpty) return;
-                var canNotify = notificationsEnabled;
-                if (canNotify) {
-                  canNotify = await _reminders.requestPermissions();
-                }
-                final newItem = RoutineItem(
-                  id:
-                      existingItem?.id ??
-                      DateTime.now().microsecondsSinceEpoch.toString(),
-                  title: title,
-                  itemType: itemType,
-                  category: category,
-                  timeOfDay: time.hour < 12
-                      ? 'morning'
-                      : time.hour < 18
-                      ? 'afternoon'
-                      : 'evening',
-                  scheduledTime: _formatTime(time),
-                  scheduledDate: _dateKey(date),
-                  recurrenceRule: recurrenceRule,
-                  notificationsEnabled: canNotify,
-                  eventTimestamp: existingItem?.eventTimestamp,
-                  recordedAtTimestamp: existingItem?.recordedAtTimestamp,
-                  isCompleted: recurrenceRule == 'none'
-                      ? existingItem?.isCompleted ?? false
-                      : false,
-                  notes: notesController.text.trim().isEmpty
-                      ? null
-                      : notesController.text.trim(),
-                  prepOffsetMinutes: itemType == 'preparation'
-                      ? int.tryParse(prepController.text)
-                      : null,
-                  numericValue: existingItem?.numericValue,
-                  unit: existingItem?.unit,
-                  topicSources: itemType == 'briefing'
-                      ? existingItem?.topicSources ??
-                            ['TechCrunch', 'Bloomberg', 'HackerNews']
-                      : null,
-                  briefStories: itemType == 'briefing'
-                      ? existingItem?.briefStories ?? []
-                      : null,
-                );
-                await _repository.insertItem(newItem);
-                await _reminders.schedule(newItem);
-                final pendingCount = await _reminders.pendingCount();
-                if (!mounted) return;
-                setState(() {
-                  _pendingReminderCount = pendingCount;
-                  final existingIndex = _items.indexWhere(
-                    (item) => item.id == newItem.id,
-                  );
-                  if (existingIndex == -1) {
-                    _items.add(newItem);
-                  } else {
-                    _items[existingIndex] = newItem;
-                  }
-                  _selectedDate = date;
-                });
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-                if (notificationsEnabled && !canNotify && mounted) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Item created, but notification permission was not granted.',
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: Text(
-                existingItem == null ? 'Create Item' : 'Save Changes',
               ),
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showItemActions(RoutineItem item) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('Edit'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showItemBuilder(existingItem: item);
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: Text(
+                  'Delete',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _confirmDeleteItem(item);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -632,185 +693,190 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return _TextEditingControllerOwner(
           controllers: [noteController, numController],
           child: StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Fast Event & Observation Logger',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
+            builder: (context, setSheetState) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Fast Event & Observation Logger',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          onPressed: () => Navigator.pop(context),
                         ),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Target Date (Dual Timestamping)',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 13,
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  AnduraChoiceRow<String>(
-                    values: const ['Today', 'Yesterday', 'Tomorrow'],
-                    selected: dateMode,
-                    label: (val) => val,
-                    onSelected: (val) => setSheetState(() => dateMode = val),
-                  ),
-                  const SizedBox(height: 16),
-                  AnduraTextArea(
-                    controller: noteController,
-                    labelText: 'What happened or what did you observe?',
-                    hintText:
-                        'e.g. Car engine hesitated, plant soil was dry...',
-                    minLines: 3,
-                    maxLines: 4,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AnduraTextField(
-                          controller: numController,
-                          keyboardType: TextInputType.number,
-                          labelText: 'Numeric Value',
-                          hintText: 'e.g. 5.5',
-                        ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Target Date (Dual Timestamping)',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: AnduraSelect<String>(
-                          value: category,
-                          labelText: 'Category',
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'personal',
-                              child: Text('Personal'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'work',
-                              child: Text('Work'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'family',
-                              child: Text('Family'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'home',
-                              child: Text('Home'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'finance',
-                              child: Text('Finance'),
-                            ),
-                          ],
-                          onChanged: (val) =>
-                              setSheetState(() => category = val!),
+                    ),
+                    const SizedBox(height: 8),
+                    AnduraChoiceRow<String>(
+                      values: const ['Today', 'Yesterday', 'Tomorrow'],
+                      selected: dateMode,
+                      label: (val) => val,
+                      onSelected: (val) => setSheetState(() => dateMode = val),
+                    ),
+                    const SizedBox(height: 16),
+                    AnduraTextArea(
+                      controller: noteController,
+                      labelText: 'What happened or what did you observe?',
+                      hintText:
+                          'e.g. Car engine hesitated, plant soil was dry...',
+                      minLines: 3,
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AnduraTextField(
+                            controller: numController,
+                            keyboardType: TextInputType.number,
+                            labelText: 'Numeric Value',
+                            hintText: 'e.g. 5.5',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF38BDF8),
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: AnduraSelect<String>(
+                            value: category,
+                            labelText: 'Category',
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'personal',
+                                child: Text('Personal'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'work',
+                                child: Text('Work'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'family',
+                                child: Text('Family'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'home',
+                                child: Text('Home'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'finance',
+                                child: Text('Finance'),
+                              ),
+                            ],
+                            onChanged: (val) =>
+                                setSheetState(() => category = val!),
+                          ),
                         ),
-                      ),
-                      onPressed: () async {
-                        if (noteController.text.isNotEmpty ||
-                            numController.text.isNotEmpty) {
-                          final now = DateTime.now();
-                          final dayOffset = dateMode == 'Yesterday'
-                              ? -1
-                              : dateMode == 'Tomorrow'
-                              ? 1
-                              : 0;
-                          final eventDate = DateTime(
-                            now.year,
-                            now.month,
-                            now.day + dayOffset,
-                            now.hour,
-                            now.minute,
-                          );
-                          final newItem = RoutineItem(
-                            id: DateTime.now().microsecondsSinceEpoch
-                                .toString(),
-                            title: noteController.text.isNotEmpty
-                                ? noteController.text.split('\n').first
-                                : 'Quick Observation Log',
-                            itemType: 'log',
-                            category: category,
-                            timeOfDay: eventDate.hour < 12
-                                ? 'morning'
-                                : eventDate.hour < 18
-                                ? 'afternoon'
-                                : 'evening',
-                            scheduledTime: _formatTime(
-                              TimeOfDay.fromDateTime(eventDate),
-                            ),
-                            scheduledDate: _dateKey(eventDate),
-                            isCompleted: true,
-                            eventTimestamp: eventDate.toIso8601String(),
-                            recordedAtTimestamp: now.toIso8601String(),
-                            notes: noteController.text.isNotEmpty
-                                ? noteController.text
-                                : null,
-                            numericValue: double.tryParse(numController.text),
-                            unit: numController.text.isNotEmpty
-                                ? 'units'
-                                : null,
-                          );
-                          await _repository.insertItem(newItem);
-                          if (mounted) {
-                            setState(() {
-                              _items.add(newItem);
-                              _selectedDate = eventDate;
-                            });
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF38BDF8),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () async {
+                          if (noteController.text.isNotEmpty ||
+                              numController.text.isNotEmpty) {
+                            final now = DateTime.now();
+                            final dayOffset = dateMode == 'Yesterday'
+                                ? -1
+                                : dateMode == 'Tomorrow'
+                                ? 1
+                                : 0;
+                            final eventDate = DateTime(
+                              now.year,
+                              now.month,
+                              now.day + dayOffset,
+                              now.hour,
+                              now.minute,
+                            );
+                            final newItem = RoutineItem(
+                              id: DateTime.now().microsecondsSinceEpoch
+                                  .toString(),
+                              title: noteController.text.isNotEmpty
+                                  ? noteController.text.split('\n').first
+                                  : 'Quick Observation Log',
+                              itemType: 'log',
+                              category: category,
+                              timeOfDay: eventDate.hour < 12
+                                  ? 'morning'
+                                  : eventDate.hour < 18
+                                  ? 'afternoon'
+                                  : 'evening',
+                              scheduledTime: _formatTime(
+                                TimeOfDay.fromDateTime(eventDate),
+                              ),
+                              scheduledDate: _dateKey(eventDate),
+                              isCompleted: true,
+                              eventTimestamp: eventDate.toIso8601String(),
+                              recordedAtTimestamp: now.toIso8601String(),
+                              notes: noteController.text.isNotEmpty
+                                  ? noteController.text
+                                  : null,
+                              numericValue: double.tryParse(numController.text),
+                              unit: numController.text.isNotEmpty
+                                  ? 'units'
+                                  : null,
+                            );
+                            await _repository.insertItem(newItem);
+                            if (mounted) {
+                              setState(() {
+                                _items.add(newItem);
+                                _selectedDate = eventDate;
+                              });
+                            }
                           }
-                        }
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                      child: const Text(
-                        'Save Log Entry',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'Save Log Entry',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            },
           ),
         );
       },
@@ -829,315 +895,322 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
-            return AlertDialog(
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerLow,
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      item.title,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                      ),
+            return Dialog.fullscreen(
+              child: Scaffold(
+                appBar: AppBar(
+                  title: Text(
+                    item.title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.tune,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 20,
+                  actions: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.tune,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 20,
+                      ),
+                      tooltip: 'Filter Sources',
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLow,
+                          builder: (sheetCtx) {
+                            return StatefulBuilder(
+                              builder: (sheetStateCtx, setSheetState) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Select Briefing Sources',
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: availableSources.map((src) {
+                                          final isSelected = selectedSources
+                                              .contains(src);
+                                          return FilterChip(
+                                            label: Text(src),
+                                            selected: isSelected,
+                                            onSelected: (val) {
+                                              setSheetState(() {
+                                                if (val) {
+                                                  selectedSources.add(src);
+                                                } else if (selectedSources
+                                                        .length >
+                                                    1) {
+                                                  selectedSources.remove(src);
+                                                }
+                                              });
+                                              setDialogState(() {});
+                                            },
+                                          );
+                                        }).toList(),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: () =>
+                                              Navigator.pop(sheetCtx),
+                                          child: const Text(
+                                            'Apply Source Selection',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
                     ),
-                    tooltip: 'Filter Sources',
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerLow,
-                        builder: (sheetCtx) {
-                          return StatefulBuilder(
-                            builder: (sheetStateCtx, setSheetState) {
-                              return Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Select Briefing Sources',
+                  ],
+                ),
+                body: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Active Sources:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: selectedSources.map((src) {
+                          return Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: Text(
+                              src,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.secondaryContainer,
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Curated Stories (${(item.briefStories ?? []).length})',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (isFetching)
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: const Icon(Icons.refresh, size: 14),
+                              label: const Text(
+                                'Refresh Feed',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              onPressed: () async {
+                                setDialogState(() => isFetching = true);
+                                final newStories = await _briefingService
+                                    .fetchBriefingStories(
+                                      selectedSources: selectedSources,
+                                    );
+                                final updatedItem = RoutineItem(
+                                  id: item.id,
+                                  title: item.title,
+                                  itemType: item.itemType,
+                                  category: item.category,
+                                  timeOfDay: item.timeOfDay,
+                                  scheduledTime: item.scheduledTime,
+                                  scheduledDate: item.scheduledDate,
+                                  recurrenceRule: item.recurrenceRule,
+                                  notificationsEnabled:
+                                      item.notificationsEnabled,
+                                  eventTimestamp: item.eventTimestamp,
+                                  recordedAtTimestamp: item.recordedAtTimestamp,
+                                  isCompleted: item.isCompleted,
+                                  notes: item.notes,
+                                  numericValue: item.numericValue,
+                                  unit: item.unit,
+                                  prepOffsetMinutes: item.prepOffsetMinutes,
+                                  topicSources: selectedSources,
+                                  briefStories: newStories
+                                      .map((s) => s.toMap())
+                                      .toList(),
+                                );
+                                await _repository.insertItem(updatedItem);
+                                if (mounted) {
+                                  setState(() {
+                                    final idx = _items.indexWhere(
+                                      (i) => i.id == item.id,
+                                    );
+                                    if (idx != -1) _items[idx] = updatedItem;
+                                  });
+                                }
+                                setDialogState(() {
+                                  item = updatedItem;
+                                  isFetching = false;
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ...(item.briefStories ?? []).map((story) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      story['source'] ?? '',
                                       style: TextStyle(
                                         color: Theme.of(
                                           context,
-                                        ).colorScheme.onSurface,
-                                        fontSize: 16,
+                                        ).colorScheme.onPrimaryContainer,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 8,
-                                      children: availableSources.map((src) {
-                                        final isSelected = selectedSources
-                                            .contains(src);
-                                        return FilterChip(
-                                          label: Text(src),
-                                          selected: isSelected,
-                                          onSelected: (val) {
-                                            setSheetState(() {
-                                              if (val) {
-                                                selectedSources.add(src);
-                                              } else if (selectedSources
-                                                      .length >
-                                                  1) {
-                                                selectedSources.remove(src);
-                                              }
-                                            });
-                                            setDialogState(() {});
-                                          },
-                                        );
-                                      }).toList(),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton(
-                                        onPressed: () =>
-                                            Navigator.pop(sheetCtx),
-                                        child: const Text(
-                                          'Apply Source Selection',
-                                        ),
+                                  ),
+                                  if (story['category'] != null)
+                                    Text(
+                                      story['category']!,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                        fontSize: 10,
                                       ),
                                     ),
-                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                story['headline'] ?? '',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
                                 ),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                story['summary'] ?? '',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Active Sources:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                bottomNavigationBar: SafeArea(
+                  minimum: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF38BDF8),
+                      ),
+                      onPressed: () async {
+                        await _setItemCompletion(
+                          item,
+                          true,
+                          occurrenceDate: _selectedDate,
+                        );
+                        if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                      },
+                      child: const Text(
+                        '✓ Mark Briefing Complete',
+                        style: TextStyle(color: Colors.black),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: selectedSources.map((src) {
-                        return Chip(
-                          visualDensity: VisualDensity.compact,
-                          label: Text(
-                            src,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSecondaryContainer,
-                            ),
-                          ),
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.secondaryContainer,
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Curated Stories (${(item.briefStories ?? []).length})',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        if (isFetching)
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            icon: const Icon(Icons.refresh, size: 14),
-                            label: const Text(
-                              'Refresh Feed',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            onPressed: () async {
-                              setDialogState(() => isFetching = true);
-                              final newStories = await _briefingService
-                                  .fetchBriefingStories(
-                                    selectedSources: selectedSources,
-                                  );
-                              final updatedItem = RoutineItem(
-                                id: item.id,
-                                title: item.title,
-                                itemType: item.itemType,
-                                category: item.category,
-                                timeOfDay: item.timeOfDay,
-                                scheduledTime: item.scheduledTime,
-                                scheduledDate: item.scheduledDate,
-                                recurrenceRule: item.recurrenceRule,
-                                notificationsEnabled: item.notificationsEnabled,
-                                eventTimestamp: item.eventTimestamp,
-                                recordedAtTimestamp: item.recordedAtTimestamp,
-                                isCompleted: item.isCompleted,
-                                notes: item.notes,
-                                numericValue: item.numericValue,
-                                unit: item.unit,
-                                prepOffsetMinutes: item.prepOffsetMinutes,
-                                topicSources: selectedSources,
-                                briefStories: newStories
-                                    .map((s) => s.toMap())
-                                    .toList(),
-                              );
-                              await _repository.insertItem(updatedItem);
-                              if (mounted) {
-                                setState(() {
-                                  final idx = _items.indexWhere(
-                                    (i) => i.id == item.id,
-                                  );
-                                  if (idx != -1) _items[idx] = updatedItem;
-                                });
-                              }
-                              setDialogState(() {
-                                item = updatedItem;
-                                isFetching = false;
-                              });
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ...(item.briefStories ?? []).map((story) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    story['source'] ?? '',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimaryContainer,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                if (story['category'] != null)
-                                  Text(
-                                    story['category']!,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              story['headline'] ?? '',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              story['summary'] ?? '',
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                fontSize: 12,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
+                  ),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF38BDF8),
-                  ),
-                  onPressed: () async {
-                    await _setItemCompletion(
-                      item,
-                      true,
-                      occurrenceDate: _selectedDate,
-                    );
-                    if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-                  },
-                  child: const Text(
-                    '✓ Mark Briefing Complete',
-                    style: TextStyle(color: Colors.black),
-                  ),
-                ),
-              ],
             );
           },
         );
@@ -1265,33 +1338,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             occurrenceDate: _selectedDate,
                           ),
                         ),
-                      PopupMenuButton<String>(
+                      IconButton(
+                        icon: const Icon(Icons.more_vert),
                         tooltip: 'Item actions',
-                        onSelected: (action) {
-                          if (action == 'edit') {
-                            _showItemBuilder(existingItem: item);
-                          } else if (action == 'delete') {
-                            _confirmDeleteItem(item);
-                          }
-                        },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: ListTile(
-                              leading: Icon(Icons.edit),
-                              title: Text('Edit'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: ListTile(
-                              leading: Icon(Icons.delete_outline),
-                              title: Text('Delete'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
+                        onPressed: () => _showItemActions(item),
                       ),
                     ],
                   ),
