@@ -488,7 +488,411 @@ If topic briefings are retained, they require:
 
 Do not build web parity, cloud infrastructure, black-box AI recommendations, or a broad social/news feed before the mobile core demonstrates retention.
 
-## 4. Profitability model
+## 4. Test strategy — what to test and how
+
+Testing should follow the same critical path as implementation. Business-rule defects should be caught by fast unit tests, screen behavior by widget tests, complete user journeys by app-level E2E tests, and operating-system behavior by native/real-device tests.
+
+### 4.1 Test layers
+
+| Layer | Purpose | Recommended tools | When to run |
+|---|---|---|---|
+| Static checks | Type, lint, and compile-time problems | `flutter analyze` | Every pull request |
+| Unit tests | Pure domain rules, time calculations, insight rules, entitlements | `flutter_test` with fake clock and dependencies | Every pull request |
+| Component tests | SQLite repositories, migrations, serialization, service adapters | `flutter_test`, `sqflite_common_ffi`, temporary files | Every pull request |
+| Widget tests | Screen states, validation, actions, semantics, themes | `flutter_test` | Every pull request |
+| App E2E tests | Full workflows through the real Flutter UI and test database | Flutter `integration_test` | Main branch and release candidates |
+| Native-system E2E | Notifications, permission dialogs, lock screen, reboot, timezone changes | Patrol, XCUITest/Espresso, or a controlled manual device script | Nightly where possible and every release candidate |
+| Store E2E | Purchase, restore, expiry, grace period, refund behavior | StoreKit sandbox/TestFlight and Google Play license testers/internal track | Every monetization release |
+| Exploratory checks | Usability, screen reader quality, unusual device behavior | Physical devices, VoiceOver, TalkBack, DevTools | Every milestone and release candidate |
+
+Flutter's `integration_test` package can automate the app UI, persistence, and navigation. It cannot reliably prove lock-screen notification delivery, reboot behavior, or every native permission flow. Those require native automation or a documented real-device test pass; a mocked plugin test is not a substitute.
+
+### 4.2 Testability changes required before expanding the suite
+
+The current widgets create concrete repositories and singleton services directly. Refactor toward dependency injection before adding large E2E suites:
+
+- [ ] Inject `RoutineRepository`, reminder gateway, settings store, metrics sink, entitlement service, and file/export gateway.
+- [ ] Inject a clock and timezone provider instead of calling `DateTime.now()` throughout business logic.
+- [ ] Inject an ID generator so fixtures and assertions are deterministic.
+- [ ] Separate reminder planning from the `flutter_local_notifications` plugin wrapper.
+- [ ] Give screens stable semantic labels and keys based on behavior, not visual position.
+- [ ] Provide a test application bootstrap with an isolated database and fake platform services.
+- [ ] Reset and close all test databases after every test.
+- [ ] Never use a developer's or user's production database in automated tests.
+- [ ] Never call live news, billing, or analytics endpoints from normal CI tests.
+- [ ] Keep test fixture loading unavailable from production UI.
+
+Add Flutter's SDK E2E package when Phase 2 begins:
+
+```yaml
+dev_dependencies:
+  integration_test:
+    sdk: flutter
+```
+
+Suggested test layout:
+
+```text
+test/
+├── unit/
+│   ├── domain/
+│   ├── application/
+│   └── services/
+├── component/
+│   ├── database/
+│   ├── repository/
+│   └── import_export/
+├── widget/
+│   ├── onboarding/
+│   ├── timeline/
+│   ├── fast_log/
+│   ├── insights/
+│   └── settings/
+└── fixtures/
+
+integration_test/
+├── first_run_journey_test.dart
+├── routine_occurrence_journey_test.dart
+├── insight_journey_test.dart
+├── backup_restore_journey_test.dart
+└── entitlement_journey_test.dart
+```
+
+The existing tests can be moved gradually; file organization should not block feature work.
+
+### 4.3 Unit and component test matrix
+
+#### Domain and time rules
+
+**What to test**
+
+- Parsing and formatting 12:00 AM, 12:00 PM, invalid times, and section boundaries.
+- Daily, weekly, and future custom recurrence projection.
+- Start dates, leap days, month/year boundaries, and preparation offsets crossing midnight.
+- Status transitions among scheduled, completed, late, skipped, rescheduled, and logged.
+- Planned, actual-event, and recorded-at timestamp semantics.
+- Backdated entries, future plans, and edits to prior occurrences.
+- Daylight-saving and timezone behavior for supported scheduling rules.
+
+**How**
+
+- Use pure Dart functions and table-driven fixtures.
+- Inject a fixed clock and explicit timezone.
+- Assert exact output dates/statuses rather than formatted display strings.
+- Add a regression fixture for every date/time bug found in production.
+
+#### Repository and migration behavior
+
+**What to test**
+
+- CRUD and round-trip serialization for every field and status.
+- Independent completion history for recurring and one-time items.
+- Seven-day/30-day range query boundaries and chronological ordering.
+- Cascade behavior when deleting an item.
+- Transaction rollback after a forced write/import failure.
+- Empty database behavior without automatic sample restoration.
+- Migration from every shipped schema version to the newest schema.
+- Malformed legacy JSON, null legacy fields, duplicate IDs, and partial records.
+
+**How**
+
+- Use `sqflite_common_ffi` with a uniquely named temporary database per test.
+- Create old schema fixtures directly with SQL, insert known rows, open with the new migrator, and compare every preserved value.
+- Close and delete the database in `tearDown`.
+- Test failed transactions by injecting or deliberately triggering an invalid row inside the transaction.
+
+#### Reminder planning and service adapter
+
+**What to test**
+
+- One-time, daily, weekly, preparation, and cross-midnight schedules.
+- Stable base reminder IDs and distinct snooze IDs.
+- Snooze does not remove the next recurring reminder.
+- Edit, disable, completion, deletion, and reset produce the correct schedule/cancel operations.
+- Notification actions map to the intended occurrence.
+- Exact-permission denial selects the documented inexact fallback.
+- Permission revocation and reconciliation remove stale assumptions.
+
+**How**
+
+- Move schedule calculation into a pure `ReminderPlanner` and unit-test its commands with a fixed clock.
+- Put the plugin behind a gateway and use a fake gateway that records schedule/cancel calls.
+- Reserve actual delivery, notification shade, and lock-screen assertions for native-system E2E tests.
+
+#### Insight engine
+
+**What to test**
+
+- Timing shifts at, below, and above each threshold.
+- Minimum sample requirements and prior-period comparison.
+- Repeated-note normalization, punctuation, case, and common false matches.
+- Missed/skipped routine trends.
+- Candidate co-occurrence positive, negative, and insufficient-opportunity cases.
+- Cross-midnight and timezone evidence.
+- No data and insufficient data return no fabricated insight.
+- Every result includes the correct evidence IDs, period, sample count, and cautious language.
+- Suggested actions change only the intended schedule field.
+- Performance with at least 1,000 occurrences.
+
+**How**
+
+- Use named, deterministic multi-day fixtures where expected evidence IDs are explicit.
+- Test each rule separately before testing combined reports.
+- Add negative fixtures designed to look correlated but fail the minimum evidence rule.
+- Keep rule output structured; test presentation copy separately from evidence selection.
+
+#### Import, export, settings, and privacy
+
+**What to test**
+
+- Export → delete → import round trip preserves all supported data.
+- Importing corrupt, truncated, future-version, duplicate, and incompatible files.
+- Import is atomic and leaves existing data unchanged on failure.
+- Theme and settings survive app restart; invalid values fall back safely.
+- Delete-history and delete-all affect exactly the intended records.
+- Metrics events contain only approved fields and never include titles, notes, measurements, or exact personal timestamps.
+
+**How**
+
+- Use temporary files and compare normalized domain objects rather than raw JSON ordering.
+- Inject an in-memory settings store and an event-recording metrics sink.
+- Maintain an allow-list for metrics payload keys and unit-test every event constructor.
+
+#### Entitlements and billing
+
+**What to test**
+
+- Free, trial, Pro, expired, grace-period, billing-retry, refunded, and offline-cached states.
+- Purchase and restore success, cancellation, timeout, and store error.
+- Existing user data remains readable/exportable after entitlement expiry.
+- Premium mutations are blocked consistently while data is never deleted.
+
+**How**
+
+- Keep entitlement policy in a pure service and test it with a fake store client.
+- Use fake purchase results in CI; use real store sandbox tests only in the release matrix.
+- Never make ordinary unit tests depend on StoreKit, Play Billing, or RevenueCat availability.
+
+#### Optional briefing adapters
+
+If Phase 8 retains briefings, unit-test feed parsing, sanitization, deduplication, attribution, cache age, stale fallback, timeout, rate limit, and malformed responses using saved fixtures or a local mock server. Do not use live publishers in CI.
+
+### 4.4 Widget test matrix
+
+Pump each screen with fake repositories/services so every state can be reached deterministically.
+
+| Area | Widget behavior to test |
+|---|---|
+| Onboarding | Fresh install, template selection, skip path, contextual permission explanation, completion persistence |
+| Timeline | Loading, empty, populated, error, selected date, filters, compact card, details, Done/Late/Skip actions |
+| Item builder | Required validation, progressive fields by type, recurrence, date/time, notification denial, edit preservation |
+| Fast Log | Exact date/time, note-only, measurement with unit, linked routine, invalid/empty input, save failure |
+| Weekly Insights | Insufficient history, populated report, evidence expansion, dismissed insight, suggested action confirmation |
+| Settings/data | Permission states, export result, import error, destructive confirmation, theme persistence |
+| Monetization | Free/Pro states, paywall timing, purchase progress/error, restore, expired entitlement without hidden data |
+
+For every critical screen:
+
+- [ ] Test light and dark themes.
+- [ ] Test large text without clipped actions or overflow.
+- [ ] Test semantic labels and selected/disabled states.
+- [ ] Check Flutter accessibility guidelines for labeled targets, contrast, and touch-target size where applicable.
+- [ ] Use a small number of stable golden tests for high-value layouts; do not replace behavioral assertions with screenshots.
+
+### 4.5 Automated app E2E scenarios
+
+Run these through the real Flutter UI with a real isolated SQLite database. Fake only boundaries that cannot be made deterministic in CI, such as the OS notification center and app-store backend.
+
+#### E2E-01 — First-run Plan → Record journey
+
+1. Launch with fresh app data.
+2. Complete onboarding without sample records.
+3. Create a daily routine and enable its reminder through a fake permission gateway.
+4. Verify it appears on the correct date and time.
+5. Mark the occurrence late and add a note.
+6. Restart the app.
+7. Verify the status, actual time, note, and recurrence remain correct.
+
+#### E2E-02 — Independent recurring occurrences
+
+1. Create a daily routine.
+2. Complete one date, skip the next, and leave the third scheduled.
+3. Navigate backward and forward through the dates.
+4. Edit the template without erasing prior occurrence history.
+5. Restart and verify all three dates remain independent.
+
+#### E2E-03 — Backdated measurement
+
+1. Open Fast Log.
+2. Choose a prior date and exact event time.
+3. Enter a measurement and unit, linked to an existing routine.
+4. Save and verify it appears at the correct historical position.
+5. Verify recorded-at time differs from event time and survives restart.
+
+#### E2E-04 — Edit, reschedule, and delete
+
+1. Create a notified recurring item.
+2. Edit its time and recurrence.
+3. Verify the fake notification gateway contains one correct base schedule and no stale schedule.
+4. Delete the item with confirmation.
+5. Verify the item, occurrence history, and pending reminder are removed.
+
+#### E2E-05 — Evidence-backed weekly insight
+
+1. Load a test-only seven-day fixture with known delays and skipped events.
+2. Open Weekly Insights.
+3. Verify the expected rule appears and unrelated rules do not.
+4. Expand evidence and verify the displayed dates match fixture records.
+5. Accept a schedule-adjustment suggestion.
+6. Return to the timeline and verify only the intended routine changed.
+7. Repeat with insufficient history and verify no fabricated insight appears.
+
+#### E2E-06 — Export, clear, and restore
+
+1. Create items, occurrences, notes, measurements, and settings.
+2. Export to a test-controlled file location.
+3. Delete all data and verify the empty state.
+4. Import the file.
+5. Verify all records, relationships, settings, and history are restored.
+6. Attempt a corrupt import and verify existing data remains unchanged.
+
+#### E2E-07 — Recoverable failures
+
+1. Force repository load and save failures through a test adapter.
+2. Verify useful error and retry states.
+3. Retry after restoring the adapter.
+4. Verify no duplicate or lost records.
+
+#### E2E-08 — Entitlement journey
+
+1. Reach the paywall after the configured value moment.
+2. Simulate purchase success and verify Pro features unlock.
+3. Restart offline and verify cached entitlement behavior.
+4. Simulate expiry and verify existing data remains visible/exportable.
+5. Simulate restore and verify access returns.
+
+### 4.6 Native and real-device E2E scenarios
+
+These scenarios cross the Flutter/OS boundary and must not be signed off using mocks alone:
+
+| ID | Scenario | Required assertion |
+|---|---|---|
+| N-01 | App terminated before a one-time reminder | Notification appears at the expected local time |
+| N-02 | Done from notification shade/lock screen | Correct occurrence is completed after reopening the app |
+| N-03 | Snooze a recurring reminder | Snooze appears after 10 minutes and the next recurrence remains scheduled |
+| N-04 | Add Note action | App opens the logger linked to the triggering occurrence |
+| N-05 | Permission denied/revoked | App shows accurate status and continues safely with documented fallback |
+| N-06 | Android exact alarm denied | Inexact mode is used and clearly communicated |
+| N-07 | Device reboot/app upgrade | Eligible reminders are restored without duplicates |
+| N-08 | Timezone/DST change | Future reminders follow the documented local-time behavior |
+| N-09 | Notification action near midnight | Completion is assigned to the intended occurrence date |
+
+**How to run**
+
+- Schedule test notifications one or two minutes ahead using dedicated test data.
+- Test at least one physical iOS device and two supported Android OS versions.
+- Use Patrol or native XCUITest/Espresso for permission and notification UI when stable; otherwise follow a versioned manual script.
+- Capture device model, OS version, timezone, result, logs, and evidence for every release candidate.
+- Include denied and later-revoked permissions, not only the happy path.
+
+### 4.7 Store sandbox E2E scenarios
+
+Before a monetized release, test on both store ecosystems:
+
+- New monthly and annual purchase
+- User-cancelled purchase
+- Store/network failure
+- Restore on a second installation/device
+- Subscription renewal
+- Cancellation with access until period end
+- Billing retry and grace period
+- Expiry and re-subscription
+- Refund/revocation
+- Offline launch with a previously cached entitlement
+
+Use Apple sandbox/TestFlight and Google Play license testers/internal testing. Verify both the store state and visible app entitlement; dashboard-only confirmation is insufficient.
+
+### 4.8 Performance, accessibility, and security checks
+
+**Performance**
+
+- Seed 1,000 and 10,000 occurrences and measure timeline query, report generation, startup, and scrolling.
+- Preserve the PRD goal of sub-100ms local timeline query for 1,000 items where practical.
+- Use Flutter integration performance traces and DevTools to detect dropped frames and memory growth.
+
+**Accessibility**
+
+- Automate semantic labels, touch targets, and large-text layout where possible.
+- Manually complete the core journey with VoiceOver and TalkBack before release.
+- Verify status is communicated by text/semantics, not color alone.
+
+**Security/privacy**
+
+- Verify exports do not unintentionally enter logs or analytics.
+- Verify secrets and store credentials are not committed to the repository.
+- Verify delete-all removes application records and test whether backups follow the documented policy.
+- Inspect release logs to ensure personal titles, notes, and measurements are not printed.
+- Perform a migration and import threat review before accepting untrusted backup files.
+
+### 4.9 Test requirements by implementation phase
+
+| Phase | Required test gate |
+|---|---|
+| Phase 0 | Moderated usability script and documented interview evidence; no automated substitute |
+| Phase 1 | Domain unit tests plus repository/migration component tests, including all shipped schema versions |
+| Phase 2 | Widget tests for all screen states plus E2E-01 through E2E-03 |
+| Phase 3 | Reminder planner unit tests, fake-gateway integration tests, and native scenarios N-01 through N-09 |
+| Phase 4 | Deterministic insight-rule unit tests plus E2E-05 with evidence verification |
+| Phase 5 | Export/import, privacy payload, accessibility, performance, and E2E-06/E2E-07 |
+| Phase 6 | Beta telemetry validation, exploratory regression, and real-device release-candidate pass |
+| Phase 7 | Entitlement unit/widget tests, E2E-08, and full store sandbox matrix |
+| Phase 8 | Contract, unit, E2E, privacy, and cost tests specific to each optional integration |
+
+### 4.10 Commands and CI gates
+
+Local and pull-request baseline:
+
+```sh
+flutter analyze
+flutter test
+flutter test --coverage
+```
+
+App E2E after adding `integration_test`:
+
+```sh
+flutter test integration_test -d <device-id>
+flutter test integration_test/first_run_journey_test.dart -d <device-id>
+```
+
+If Patrol is selected for native automation:
+
+```sh
+patrol test -d <device-id>
+```
+
+Recommended CI schedule:
+
+- **Every pull request:** formatting check, `flutter analyze`, unit, component, and widget tests.
+- **Main branch/nightly:** Android emulator E2E; iOS simulator E2E on a macOS runner where available.
+- **Release candidate:** signed Android/iOS builds, physical-device native matrix, accessibility pass, migration/backup restore, and store sandbox tests.
+
+Coverage is a diagnostic, not the goal. Require complete behavioral coverage for migrations, status transitions, reminder planning, insight evidence, import atomicity, and entitlements. Do not hide flaky tests behind automatic retries; fix their clocks, state isolation, selectors, or platform assumptions.
+
+### 4.11 Definition of tested for each change
+
+A feature or bug fix is not complete until:
+
+1. Its business rules have unit tests.
+2. Its database or platform boundary has component tests with fakes or isolated resources.
+3. Its visible states and failure paths have widget tests.
+4. A changed critical journey has an E2E test.
+5. A native-system change has real-device evidence where Flutter automation cannot prove it.
+6. A regression test fails before the fix and passes after it.
+7. Tests are deterministic, isolated, and pass in CI.
+8. No test sends personal data or calls production services.
+
+## 5. Profitability model
 
 ### Current state
 
@@ -523,7 +927,7 @@ Annual profit =
 
 The local-first architecture can keep variable costs low. Live briefings or cloud sync would reduce that advantage and must have separate unit-economics justification.
 
-## 5. Metrics required to know whether the app is profitable
+## 6. Metrics required to know whether the app is profitable
 
 Track at minimum:
 
@@ -544,7 +948,7 @@ Track at minimum:
 - variable API/infrastructure cost per user
 - support and development costs
 
-## 6. Commercial definition of done
+## 7. Commercial definition of done
 
 Routine is commercially ready when:
 
@@ -557,6 +961,6 @@ Routine is commercially ready when:
 7. Store purchases, restores, and entitlement expiry are safe.
 8. Contribution revenue exceeds store, acquisition, infrastructure, support, and development costs.
 
-## 7. Immediate next action
+## 8. Immediate next action
 
 Start with **Phase 0**, not billing or live briefings. In parallel, prepare the Phase 1 occurrence/status migration design so implementation can begin as soon as the target audience and core workflow are confirmed.
