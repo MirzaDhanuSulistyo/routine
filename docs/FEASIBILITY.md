@@ -52,7 +52,7 @@ Platform constraints primarily affect **high-precision alarm playback** on iOS (
 
 ### Include
 
-- Flexible Item builder (Reminders, Tasks, Maintenance, Deadlines, Preparation, Briefing, Log/Observation, Measurement).
+- Flexible Item builder (Reminders, Tasks, Maintenance, Deadlines, Preparation, Briefing, and Log/Observation).
 - Unified Chronological Timeline (Morning, Afternoon, Evening).
 - Local Notifications & Actionable Alarms.
 - Fast Event Logging with Present, Past (backdated), and Future support.

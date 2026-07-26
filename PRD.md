@@ -15,7 +15,7 @@
 
 ### Core Goals
 - **Remind**: Deliver time-sensitive alarms, preparation steps, maintenance schedules, and topic briefings across daily life domains.
-- **Record**: Provide friction-free logging for actual completions, delays, measurements, and free-text observations, including past (backdated) and future entries.
+- **Record**: Provide friction-free logging for actual completions, delays, and free-text observations, including past (backdated) and future entries.
 - **Understand**: Generate weekly pattern and anomaly reports that highlight timing shifts, repeated observations, and potential correlations without false causal claims.
 - **Privacy-First & Offline Ready**: Run core operations locally on-device without requiring external servers for habit data.
 
@@ -44,7 +44,7 @@
 ## 4. Scope Classification (P0 / P1 / P2)
 
 ### P0 (MVP — Critical path)
-- **FR-1: Flexible Item Builder**: Create items categorized as Reminder, Task, Maintenance, Deadline, Preparation, Topic Briefing, Log/Observation, or Measurement.
+- **FR-1: Flexible Item Builder**: Create items categorized as Reminder, Task, Maintenance, Deadline, Preparation, Topic Briefing, or Log/Observation.
 - **FR-2: Unified Chronological Timeline**: View planned and actual items grouped by time of day (Morning, Afternoon, Evening) for present, past, and future dates.
 - **FR-3: Local Alarms & Action Notifications**: Trigger precise local alarms and notifications with actionable buttons (*Done, Snooze, Add Note*).
 - **FR-4: Fast Event & Dual-Timestamp Logging**: Record actual outcomes with distinct `event_timestamp` (when it happened) and `recorded_at_timestamp` (when entered).
@@ -90,7 +90,7 @@
 - **Acceptance Criteria**:
   - [ ] User can log an entry for Today, Yesterday (past), or Tomorrow (future).
   - [ ] Database stores both `event_timestamp` (user-chosen event time) and `recorded_at_timestamp` (system clock time).
-  - [ ] Users can enter free-text notes ("Car made a grinding noise") or numeric values ("Slept 5.5 hours").
+  - [ ] Users can enter free-text observations ("Car made a grinding noise") without requiring manual numeric entry.
 
 ### FR-5: Scheduled Topic Briefings
 - **Description**: Deliver finite topic updates at user-specified times.
@@ -106,6 +106,7 @@
   - [ ] System highlights repeated keyword observations (e.g. "car noise" entered 2x in 7 days).
   - [ ] System detects co-occurring events (e.g. "Overtime clock-out coincided with missed math practice on 3 of last 4 Tuesdays").
   - [ ] Insights explicitly state: *"This pattern was observed..."* avoiding definitive causal assertions.
+  - [ ] Insights use automatically captured timing, completion, delay, skip, snooze, and observation history rather than requiring daily numeric entry.
 
 ---
 
@@ -127,14 +128,13 @@
 ### Core Schema (`Item` Entity)
 - `id`: string (UUID)
 - `title`: string
-- `item_type`: enum (`reminder`, `task`, `maintenance`, `deadline`, `preparation`, `briefing`, `log`, `measurement`)
+- `item_type`: enum (`reminder`, `task`, `maintenance`, `deadline`, `preparation`, `briefing`, `log`)
 - `category`: enum (`work`, `family`, `home`, `finance`, `personal`)
 - `scheduled_timestamp`: timestamp (nullable)
 - `event_timestamp`: timestamp (time event occurred)
 - `recorded_at_timestamp`: timestamp (time entry created in DB)
 - `status`: enum (`scheduled`, `completed`, `late`, `skipped`, `logged`)
 - `notes`: text (nullable)
-- `numeric_value`: double (nullable)
 - `topic_sources`: list of strings (for briefing items)
 
 ---

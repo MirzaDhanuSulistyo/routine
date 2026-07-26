@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Ultra-low-friction bottom sheet to quickly record what happened (status, free-text observations, measurements like sleep hours) for Today, Yesterday (backdated), or Tomorrow (future). Ensures exact separation of `event_timestamp` vs `recorded_at_timestamp`.
+Ultra-low-friction bottom sheet to quickly record what happened (status and free-text observations) for Today, Yesterday (backdated), or Tomorrow (future). Ensures exact separation of `event_timestamp` vs `recorded_at_timestamp`.
 
 ## Entry points
 
@@ -20,7 +20,7 @@ Ultra-low-friction bottom sheet to quickly record what happened (status, free-te
 2. **Quick Entry Prompt**: Short headline ("What happened or what did you observe?").
 3. **Category Tag Picker**: Work, Family, Home, Finance, Personal.
 4. **Observation / Note Input**: Text area for quick observation (e.g., "Car took 3 attempts to start", "Plant leaves look yellow").
-5. **Numeric Measurement Field** (Optional): Number input for sleep hours, expenses, or counts.
+5. **Automatic Signals**: No manual numeric field. Routine derives useful signals from completion times, delays, skips, snoozes, and observations.
 
 ## Primary actions
 

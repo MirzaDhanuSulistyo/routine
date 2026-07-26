@@ -54,6 +54,28 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('fast log records observations without numeric fields', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MainNavigationScreen(
+          themeMode: ThemeMode.dark,
+          onToggleTheme: () {},
+          initialItems: const [],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Quick Log'));
+    await tester.pump();
+
+    expect(find.text('Fast Event & Observation Logger'), findsOneWidget);
+    expect(find.text('Numeric Value'), findsNothing);
+    expect(find.text('Unit Label'), findsNothing);
+  });
+
   testWidgets('timeline item exposes edit and delete dialogs', (
     WidgetTester tester,
   ) async {

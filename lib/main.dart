@@ -384,10 +384,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           value: 'log',
                           child: Text('Log Prompt'),
                         ),
-                        DropdownMenuItem(
-                          value: 'measurement',
-                          child: Text('Measurement'),
-                        ),
                       ],
                       onChanged: (value) =>
                           setDialogState(() => itemType = value!),
@@ -544,8 +540,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         prepOffsetMinutes: itemType == 'preparation'
                             ? int.tryParse(prepController.text)
                             : null,
-                        numericValue: existingItem?.numericValue,
-                        unit: existingItem?.unit,
                         topicSources: itemType == 'briefing'
                             ? existingItem?.topicSources ??
                                   ['TechCrunch', 'Bloomberg', 'HackerNews']
@@ -688,10 +682,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         String dateMode = 'Today';
         String category = 'personal';
         final noteController = TextEditingController();
-        final numController = TextEditingController();
 
         return _TextEditingControllerOwner(
-          controllers: [noteController, numController],
+          controllers: [noteController],
           child: StatefulBuilder(
             builder: (context, setSheetState) {
               return Padding(
@@ -755,48 +748,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       maxLines: 4,
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AnduraTextField(
-                            controller: numController,
-                            keyboardType: TextInputType.number,
-                            labelText: 'Numeric Value',
-                            hintText: 'e.g. 5.5',
-                          ),
+                    AnduraSelect<String>(
+                      value: category,
+                      labelText: 'Category',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'personal',
+                          child: Text('Personal'),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: AnduraSelect<String>(
-                            value: category,
-                            labelText: 'Category',
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'personal',
-                                child: Text('Personal'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'work',
-                                child: Text('Work'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'family',
-                                child: Text('Family'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'home',
-                                child: Text('Home'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'finance',
-                                child: Text('Finance'),
-                              ),
-                            ],
-                            onChanged: (val) =>
-                                setSheetState(() => category = val!),
-                          ),
+                        DropdownMenuItem(value: 'work', child: Text('Work')),
+                        DropdownMenuItem(
+                          value: 'family',
+                          child: Text('Family'),
+                        ),
+                        DropdownMenuItem(value: 'home', child: Text('Home')),
+                        DropdownMenuItem(
+                          value: 'finance',
+                          child: Text('Finance'),
                         ),
                       ],
+                      onChanged: (val) =>
+                          setSheetState(() => category = val!),
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
@@ -811,8 +783,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           ),
                         ),
                         onPressed: () async {
-                          if (noteController.text.isNotEmpty ||
-                              numController.text.isNotEmpty) {
+                          if (noteController.text.trim().isNotEmpty) {
                             final now = DateTime.now();
                             final dayOffset = dateMode == 'Yesterday'
                                 ? -1
@@ -846,13 +817,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                               isCompleted: true,
                               eventTimestamp: eventDate.toIso8601String(),
                               recordedAtTimestamp: now.toIso8601String(),
-                              notes: noteController.text.isNotEmpty
-                                  ? noteController.text
-                                  : null,
-                              numericValue: double.tryParse(numController.text),
-                              unit: numController.text.isNotEmpty
-                                  ? 'units'
-                                  : null,
+                              notes: noteController.text.trim(),
                             );
                             await _repository.insertItem(newItem);
                             if (mounted) {
@@ -1076,8 +1041,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                   recordedAtTimestamp: item.recordedAtTimestamp,
                                   isCompleted: item.isCompleted,
                                   notes: item.notes,
-                                  numericValue: item.numericValue,
-                                  unit: item.unit,
                                   prepOffsetMinutes: item.prepOffsetMinutes,
                                   topicSources: selectedSources,
                                   briefStories: newStories

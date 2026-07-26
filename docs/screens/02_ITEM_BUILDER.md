@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Modal screen for defining or editing a flexible timeline `Item`. Allows selecting item type (Reminder, Task, Maintenance, Deadline, Preparation, Topic Briefing, Log/Observation, Measurement), schedule rules, category, and attached triggers (e.g. preparation lead time).
+Modal screen for defining or editing a flexible timeline `Item`. Allows selecting item type (Reminder, Task, Maintenance, Deadline, Preparation, Topic Briefing, or Log/Observation), schedule rules, category, and attached triggers (e.g. preparation lead time).
 
 ## Entry points
 

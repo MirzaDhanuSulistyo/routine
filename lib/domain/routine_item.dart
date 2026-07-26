@@ -12,8 +12,6 @@ class RoutineItem {
   final String? recordedAtTimestamp;
   bool isCompleted;
   final String? notes;
-  final double? numericValue;
-  final String? unit;
   final int? prepOffsetMinutes;
   final List<String>? topicSources;
   final List<Map<String, String>>? briefStories;
@@ -32,8 +30,6 @@ class RoutineItem {
     this.recordedAtTimestamp,
     this.isCompleted = false,
     this.notes,
-    this.numericValue,
-    this.unit,
     this.prepOffsetMinutes,
     this.topicSources,
     this.briefStories,
@@ -52,8 +48,6 @@ class RoutineItem {
     String? recordedAtTimestamp,
     bool? isCompleted,
     String? notes,
-    double? numericValue,
-    String? unit,
     int? prepOffsetMinutes,
     List<String>? topicSources,
     List<Map<String, String>>? briefStories,
@@ -72,8 +66,6 @@ class RoutineItem {
       recordedAtTimestamp: recordedAtTimestamp ?? this.recordedAtTimestamp,
       isCompleted: isCompleted ?? this.isCompleted,
       notes: notes ?? this.notes,
-      numericValue: numericValue ?? this.numericValue,
-      unit: unit ?? this.unit,
       prepOffsetMinutes: prepOffsetMinutes ?? this.prepOffsetMinutes,
       topicSources: topicSources ?? this.topicSources,
       briefStories: briefStories ?? this.briefStories,

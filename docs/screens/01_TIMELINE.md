@@ -21,7 +21,7 @@ The central operational hub of Routine. Shows a unified chronological view of pl
    - **Morning Section (<12:00)**: Alarm items (e.g. Clock In), Contextual Preps (Warm Car), Morning Brief Card.
    - **Afternoon Section (12:00–18:00)**: Clock Out reminder, recurring maintenance (Water Plants).
    - **Evening Section (>18:00)**: Family tasks (Son's math practice), Daily Observation Log prompt ("Was anything unusual today?").
-3. **Quick Log Floating Action Button**: Fast entry for notes, measurements, or status.
+3. **Quick Log Floating Action Button**: Fast entry for observations or status.
 
 ## Primary actions
 

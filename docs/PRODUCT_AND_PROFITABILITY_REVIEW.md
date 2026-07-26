@@ -50,7 +50,7 @@ Improvements:
 
 ### 2.2 Narrow the initial product
 
-The current scope combines reminders, habit tracking, event logging, measurements, maintenance, analytics, and news briefings. That creates implementation and marketing complexity without proving that users want the combination.
+The current scope combines reminders, habit tracking, event logging, maintenance, analytics, and news briefings. That creates implementation and marketing complexity without proving that users want the combination.
 
 The recommended initial wedge is:
 
@@ -78,9 +78,8 @@ Every completion or status change should capture:
 - recorded-at timestamp
 - occurrence date
 - optional note
-- optional measurement and unit
 
-Non-recurring items must capture completion timestamps just as recurring items do. Fast Log should support an exact event date and time, meaningful units, and optional attachment to an existing routine.
+Non-recurring items must capture completion timestamps just as recurring items do. Fast Log should support an exact event date and time and optional attachment to an existing routine. Numeric entry is intentionally removed: the app should derive useful data automatically from planned times, completion times, delays, skips, snoozes, and notes.
 
 ### 2.4 Simplify the user experience
 
@@ -195,8 +194,9 @@ Proceed only when at least 10 target users commit to using a four-week beta and 
 - [ ] Store planned, actual-event, and recorded-at timestamps consistently.
 - [ ] Support completed, late, skipped, rescheduled, and logged outcomes.
 - [ ] Define how un-completing or correcting an occurrence affects history.
-- [ ] Add exact event date/time and user-selected units to Fast Log.
+- [ ] Add exact event date/time to Fast Log.
 - [ ] Allow a log to reference an existing item or occurrence.
+- [ ] Derive insights from automatic routine signals; do not require manual numeric entry.
 - [ ] Add repository range queries for seven-day and longer windows.
 - [ ] Centralize recurrence projection so UI and repository code do not duplicate the rules.
 - [ ] Add a versioned SQLite migration that preserves all current user records.
@@ -242,8 +242,9 @@ Every status action must produce deterministic, queryable occurrence history, an
 - [ ] Add item detail and occurrence history views.
 - [ ] Add one-tap Done, Late, Skip, and Add Note actions.
 - [ ] Add Today, compact week navigation, date picker, search, and filters.
-- [ ] Redesign Fast Log with exact date/time, type, unit, category, and optional linked routine.
-- [ ] Use progressive fields in the item builder for reminder, maintenance, deadline, measurement, and other behaviors.
+- [ ] Redesign Fast Log with exact date/time, type, category, and optional linked routine.
+- [ ] Remove manual numeric fields from Fast Log and routine items.
+- [ ] Use progressive fields in the item builder for reminder, maintenance, deadline, and other behaviors.
 - [ ] Persist theme and user preferences.
 - [ ] Add useful empty, loading, error, and permission-denied states.
 - [ ] Remove internal terminology from consumer-facing screens.
@@ -382,7 +383,7 @@ A user must be able to export, restore, and permanently delete their data. Relea
 
 ### Privacy-preserving events to measure
 
-Do not collect routine titles, note text, measurements, or exact personal timestamps. Measure only consented product events such as:
+Do not collect routine titles, note text, or exact personal timestamps. Measure only consented product events such as:
 
 - onboarding completed
 - first item created
@@ -435,11 +436,13 @@ Avoid advertising because it conflicts with local-first privacy positioning.
 **Pro — test approximately $4.99/month or $39.99/year:**
 
 - Unlimited active routines
-- Advanced pattern and candidate-correlation rules
-- 30-day and 90-day trends
+- Advanced pattern and candidate-correlation rules based on automatically captured routine history
+- 30-day and 90-day trends for delays, skips, snoozes, and completion behavior
 - Smart schedule-adjustment suggestions
 - Premium templates and widgets
 - Optional encrypted backup/sync when available
+
+Pro does not require manual numeric entry. The free product should capture useful event data through normal one-tap actions; Pro unlocks deeper analysis of that history. Automatic health or device integrations can be considered later, but are not required for the core product.
 
 Users must retain read/export access to their existing data after a subscription expires.
 
@@ -650,7 +653,7 @@ The existing tests can be moved gradually; file organization should not block fe
 - Import is atomic and leaves existing data unchanged on failure.
 - Theme and settings survive app restart; invalid values fall back safely.
 - Delete-history and delete-all affect exactly the intended records.
-- Metrics events contain only approved fields and never include titles, notes, measurements, or exact personal timestamps.
+- Metrics events contain only approved fields and never include titles, notes, or exact personal timestamps.
 
 **How**
 
@@ -686,7 +689,7 @@ Pump each screen with fake repositories/services so every state can be reached d
 | Onboarding | Fresh install, template selection, skip path, contextual permission explanation, completion persistence |
 | Timeline | Loading, empty, populated, error, selected date, filters, compact card, details, Done/Late/Skip actions |
 | Item builder | Required validation, progressive fields by type, recurrence, date/time, notification denial, edit preservation |
-| Fast Log | Exact date/time, note-only, measurement with unit, linked routine, invalid/empty input, save failure |
+| Fast Log | Exact date/time, note-only observation, linked routine, invalid/empty input, save failure |
 | Weekly Insights | Insufficient history, populated report, evidence expansion, dismissed insight, suggested action confirmation |
 | Settings/data | Permission states, export result, import error, destructive confirmation, theme persistence |
 | Monetization | Free/Pro states, paywall timing, purchase progress/error, restore, expired entitlement without hidden data |
@@ -721,11 +724,11 @@ Run these through the real Flutter UI with a real isolated SQLite database. Fake
 4. Edit the template without erasing prior occurrence history.
 5. Restart and verify all three dates remain independent.
 
-#### E2E-03 — Backdated measurement
+#### E2E-03 — Backdated event log
 
 1. Open Fast Log.
 2. Choose a prior date and exact event time.
-3. Enter a measurement and unit, linked to an existing routine.
+3. Enter an observation, optionally linked to an existing routine.
 4. Save and verify it appears at the correct historical position.
 5. Verify recorded-at time differs from event time and survives restart.
 
@@ -749,7 +752,7 @@ Run these through the real Flutter UI with a real isolated SQLite database. Fake
 
 #### E2E-06 — Export, clear, and restore
 
-1. Create items, occurrences, notes, measurements, and settings.
+1. Create items, occurrences, notes, and settings.
 2. Export to a test-controlled file location.
 3. Delete all data and verify the empty state.
 4. Import the file.
@@ -831,7 +834,7 @@ Use Apple sandbox/TestFlight and Google Play license testers/internal testing. V
 - Verify exports do not unintentionally enter logs or analytics.
 - Verify secrets and store credentials are not committed to the repository.
 - Verify delete-all removes application records and test whether backups follow the documented policy.
-- Inspect release logs to ensure personal titles, notes, and measurements are not printed.
+- Inspect release logs to ensure personal titles and notes are not printed.
 - Perform a migration and import threat review before accepting untrusted backup files.
 
 ### 4.9 Test requirements by implementation phase

@@ -5,8 +5,7 @@ export type ItemType =
   | 'deadline'
   | 'preparation'
   | 'briefing'
-  | 'log'
-  | 'measurement';
+  | 'log';
 
 export type Category = 'work' | 'family' | 'home' | 'finance' | 'personal';
 
@@ -23,8 +22,6 @@ export interface RoutineItem {
   recordedAtTimestamp?: string;
   status: ItemStatus;
   notes?: string;
-  numericValue?: number;
-  unit?: string;
   prepOffsetMinutes?: number;
   topicSources?: string[];
   briefStories?: {
@@ -139,9 +136,7 @@ export const initialItems: RoutineItem[] = [
     status: 'logged',
     eventTimestamp: '2026-07-20 09:15 AM',
     recordedAtTimestamp: '2026-07-20 09:15 AM',
-    notes: 'Slept 5.5 hours. Plant soil looked unusually dry. Car engine hesitated slightly.',
-    numericValue: 5.5,
-    unit: 'hours sleep'
+    notes: 'Slept poorly. Plant soil looked unusually dry. Car engine hesitated slightly.'
   }
 ];
 

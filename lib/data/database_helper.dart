@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -54,8 +54,6 @@ CREATE TABLE items (
   recorded_at_timestamp TEXT,
   is_completed INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
-  numeric_value REAL,
-  unit TEXT,
   prep_offset_minutes INTEGER,
   topic_sources_json TEXT,
   brief_stories_json TEXT
@@ -106,6 +104,27 @@ CREATE TABLE IF NOT EXISTS item_occurrences (
     }
     if (oldVersion < 4) {
       await _createOccurrencesTable(db);
+    }
+    if (oldVersion < 5) {
+      final columns = await db.rawQuery('PRAGMA table_info(items)');
+      final names = columns
+          .map((column) => column['name']?.toString())
+          .whereType<String>()
+          .toSet();
+      if (names.contains('item_type')) {
+        await db.update(
+          'items',
+          {'item_type': 'log'},
+          where: 'item_type = ?',
+          whereArgs: ['measurement'],
+        );
+      }
+      if (names.contains('numeric_value')) {
+        await db.execute('ALTER TABLE items DROP COLUMN numeric_value');
+      }
+      if (names.contains('unit')) {
+        await db.execute('ALTER TABLE items DROP COLUMN unit');
+      }
     }
   }
 

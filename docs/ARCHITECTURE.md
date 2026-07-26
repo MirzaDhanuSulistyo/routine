@@ -38,7 +38,7 @@ On data change, `Evaluate7DayPatternsUseCase` triggers in background to update `
 
 ## Domain model
 
-- `RoutineItem`: Domain entity representing scheduled tasks, reminders, prep offsets, recurrence, or recorded observations.
+- `RoutineItem`: Domain entity representing scheduled tasks, reminders, prep offsets, recurrence, or recorded observations. Numeric measurements are intentionally outside the core model.
 - `RoutineOccurrence`: Per-date completion record for a recurring item, including event and recorded timestamps.
 - `EventTimestamp`: Business value object tracking `scheduled_time`, `event_actual_time`, and `recorded_at_time`.
 - `AnomalyPattern`: Entity capturing detected timing shifts (>30m delay), repeated notes (>=3 occurrences), or candidate co-occurrences.

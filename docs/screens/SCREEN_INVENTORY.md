@@ -9,7 +9,7 @@ Routine uses a bottom tab bar navigation on mobile (and sidebar on web/tablet) a
 
 - **Primary Tabs**:
   1. **Timeline** (`routine://timeline`) — Chronological daily view (Plan & Record).
-  2. **Fast Log** (`routine://log/fast`) — Quick action sheet / modal to record observations, backdated/future events, or measurements.
+  2. **Fast Log** (`routine://log/fast`) — Quick action sheet / modal to record observations and backdated/future events.
   3. **Pattern Report** (`routine://insights`) — Weekly anomaly & correlation insights (Understand).
   4. **Settings** (`routine://settings`) — Topic preferences, alarm options, data export.
 - **Modal / Secondary Routes**:
@@ -24,7 +24,7 @@ Routine uses a bottom tab bar navigation on mobile (and sidebar on web/tablet) a
 |---|---|---|---|---|---|---|
 | 1 | Timeline (Home) | Unified chronological daily plan, logs, and topic briefs (Morning/Afternoon/Evening) | Bottom Tab / Launch | All | P0 | [`01_TIMELINE.md`](01_TIMELINE.md) |
 | 2 | Item Builder & Editor | Create or edit flexible items (Reminder, Task, Maintenance, Deadline, Preparation, Briefing, Observation) | Floating Action Button / Modal | All | P0 | [`02_ITEM_BUILDER.md`](02_ITEM_BUILDER.md) |
-| 3 | Fast Observation Logger | 1-tap logging for present, backdated, or future notes, measurements, and status | Navigation Bar + / Quick Action | All | P0 | [`03_FAST_LOG.md`](03_FAST_LOG.md) |
+| 3 | Fast Observation Logger | 1-tap logging for present, backdated, or future notes and status | Navigation Bar + / Quick Action | All | P0 | [`03_FAST_LOG.md`](03_FAST_LOG.md) |
 | 4 | Topic Briefing Reader | Read finite top 3–5 news & social updates for followed topics | Timeline Card / Notification Tap | All | P0 | [`04_TOPIC_BRIEFING.md`](04_TOPIC_BRIEFING.md) |
 | 5 | Pattern & Anomaly Report | Weekly report highlighting timing shifts, repeated notes, and candidate correlations | Bottom Tab | All | P0 | [`05_PATTERN_REPORT.md`](05_PATTERN_REPORT.md) |
 | 6 | Settings & Topic Manager | Manage followed topics (Reddit/Bluesky/RSS), alarm sounds, and database exports | Bottom Tab / Header Icon | All | P1 | [`06_SETTINGS.md`](06_SETTINGS.md) |

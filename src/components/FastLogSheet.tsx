@@ -12,11 +12,9 @@ export const FastLogSheet: React.FC<FastLogSheetProps> = ({ open, onClose, onSav
   const [dateMode, setDateMode] = useState<'today' | 'yesterday' | 'tomorrow'>('today');
   const [category, setCategory] = useState<Category>('personal');
   const [notes, setNotes] = useState('');
-  const [numericValue, setNumericValue] = useState<number | undefined>(undefined);
-  const [unit, setUnit] = useState('hours sleep');
 
   const handleSave = () => {
-    if (!notes.trim() && numericValue === undefined) return;
+    if (!notes.trim()) return;
 
     let eventTime = '2026-07-20 09:00 AM';
     if (dateMode === 'yesterday') eventTime = '2026-07-19 09:00 AM (Backdated)';
@@ -32,13 +30,10 @@ export const FastLogSheet: React.FC<FastLogSheetProps> = ({ open, onClose, onSav
       status: 'logged',
       eventTimestamp: eventTime,
       recordedAtTimestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      notes: notes.trim() ? notes : undefined,
-      numericValue,
-      unit: numericValue !== undefined ? unit : undefined,
+      notes: notes.trim(),
     });
 
     setNotes('');
-    setNumericValue(undefined);
     onClose();
   };
 
@@ -73,23 +68,6 @@ export const FastLogSheet: React.FC<FastLogSheetProps> = ({ open, onClose, onSav
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div>
-            <label style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Value (Optional)</label>
-            <Input
-              type="number"
-              placeholder="e.g. 5.5"
-              value={numericValue ?? ''}
-              onChange={(e) => setNumericValue(e.target.value ? parseFloat(e.target.value) : undefined)}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '13px', color: '#94a3b8', display: 'block', marginBottom: '6px' }}>Unit Label</label>
-            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. hours, USD" />
-          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>

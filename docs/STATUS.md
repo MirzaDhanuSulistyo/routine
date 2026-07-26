@@ -17,7 +17,7 @@
 - SQLite schema and repository persistence
 - Flexible routine item creation
 - Past, present, and future date navigation
-- Fast text/numeric logs with separate ISO event and recorded timestamps
+- Fast text observation logs with separate ISO event and recorded timestamps
 - Item completion persistence
 - Per-occurrence completion history keyed by recurring item and date
 - Completion event/recorded timestamps for recurring occurrences

@@ -28,7 +28,7 @@ Users struggle to connect cause and effect across days (e.g., late clock-outs le
 **Unified Chronological Timeline & 3-Layer Life Operations Model**:
 
 1. **Plan (Expected Events)**: Flexible Items combining Reminders, Tasks, Maintenance, Deadlines, Contextual Preparations, and Scheduled Topic Briefings.
-2. **Record (Actual Events & Log Entries)**: Fast logging of actual completions, deviations, free-text observations, numeric measurements, and backdated/future-dated logs (separating `event_timestamp` from `recorded_at_timestamp`).
+2. **Record (Actual Events & Log Entries)**: Fast logging of actual completions, deviations, free-text observations, and backdated/future-dated logs (separating `event_timestamp` from `recorded_at_timestamp`).
 3. **Understand (Pattern & Anomaly Intelligence)**: Rule-based pattern detection highlighting repeated exceptions, timing shifts, missed routines, and potential correlations (e.g., "Late clock-outs on Tuesdays coincided with missed study sessions").
 
 ## Core Product Primitive: Flexible "Item"
@@ -40,8 +40,7 @@ All entries exist on a single timeline and adopt specific behaviors:
 - **Deadline**: Pay electricity bill by July 25
 - **Preparation**: Warm the car 10 minutes before leaving
 - **Topic Briefing**: 3 concise updates on AI and local politics at 07:00 Morning Brief
-- **Log Prompt / Observation**: Record unusual events, symptoms, or notes (e.g., "Car made an unusual noise")
-- **Measurement**: Log values (e.g., Slept 5.5 hours)
+- **Log Prompt / Observation**: Record unusual events, delays, symptoms, or notes without requiring manual numeric entry (e.g., "Car made an unusual noise")
 
 ## Value proposition
 

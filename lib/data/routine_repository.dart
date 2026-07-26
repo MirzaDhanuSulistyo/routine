@@ -220,10 +220,6 @@ class RoutineRepository {
       recordedAtTimestamp: map['recorded_at_timestamp']?.toString(),
       isCompleted: map['is_completed'] == 1 || map['is_completed'] == true,
       notes: map['notes']?.toString(),
-      numericValue: map['numeric_value'] != null
-          ? (map['numeric_value'] as num).toDouble()
-          : null,
-      unit: map['unit']?.toString(),
       prepOffsetMinutes: map['prep_offset_minutes'] != null
           ? (map['prep_offset_minutes'] as num).toInt()
           : null,
@@ -247,8 +243,6 @@ class RoutineRepository {
       'recorded_at_timestamp': item.recordedAtTimestamp,
       'is_completed': item.isCompleted ? 1 : 0,
       'notes': item.notes,
-      'numeric_value': item.numericValue,
-      'unit': item.unit,
       'prep_offset_minutes': item.prepOffsetMinutes,
       'topic_sources_json': item.topicSources == null
           ? null
@@ -359,9 +353,7 @@ class RoutineRepository {
         scheduledDate: dateKey,
         eventTimestamp: eventAt(9, 15),
         recordedAtTimestamp: eventAt(9, 15),
-        notes: 'Slept 5.5 hours. Plant soil looked dry.',
-        numericValue: 5.5,
-        unit: 'hours sleep',
+        notes: 'Slept poorly. Plant soil looked dry.',
       ),
     ];
   }
