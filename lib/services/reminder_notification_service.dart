@@ -13,6 +13,10 @@ import '../domain/routine_item.dart';
 const _doneAction = 'routine_done';
 const _snoozeAction = 'routine_snooze';
 const _addNoteAction = 'routine_add_note';
+// Use a new channel ID so Android devices that created the old channel can
+// receive the sound settings below. Android does not update channel sound
+// settings after a channel has been created.
+const _channelId = 'routine_alarm_reminders_v2';
 const _category = 'routine_reminder';
 
 @pragma('vm:entry-point')
@@ -154,7 +158,8 @@ class ReminderNotificationService {
     final notificationDetails = _notificationDetails();
     final id = notificationIdFor(item.id);
 
-    await _plugin.cancel(id: id);
+    await _cancelNotificationId(id);
+    await _cancelNotificationId(snoozeNotificationIdFor(item.id));
     try {
       await _plugin.zonedSchedule(
         id: id,
@@ -197,11 +202,8 @@ class ReminderNotificationService {
   Future<void> cancel(String itemId) async {
     if (!_initialized) await initialize();
     if (!_initialized || kIsWeb) return;
-    try {
-      await _plugin.cancel(id: notificationIdFor(itemId));
-    } catch (error) {
-      debugPrint('Reminder cancellation failed: $error');
-    }
+    await _cancelNotificationId(notificationIdFor(itemId));
+    await _cancelNotificationId(snoozeNotificationIdFor(itemId));
   }
 
   Future<int> pendingCount() async {
@@ -252,8 +254,18 @@ class ReminderNotificationService {
   }
 
   static int notificationIdFor(String itemId) {
+    return _hashNotificationId(itemId);
+  }
+
+  /// Keeps a snooze independent from a daily/weekly notification. Reusing the
+  /// recurring notification ID would replace the recurring schedule.
+  static int snoozeNotificationIdFor(String itemId) {
+    return _hashNotificationId('$itemId:snooze');
+  }
+
+  static int _hashNotificationId(String value) {
     var hash = 0x811c9dc5;
-    for (final unit in itemId.codeUnits) {
+    for (final unit in value.codeUnits) {
       hash ^= unit;
       hash = (hash * 0x01000193) & 0x7fffffff;
     }
@@ -281,11 +293,20 @@ class ReminderNotificationService {
             eventTime: now,
           );
         }
+        // Dismissing a recurring notification must not cancel its future
+        // occurrences. A snoozed notification has its own one-time ID.
+        if (response.id != null &&
+            (item.recurrenceRule == 'none' ||
+                response.id == snoozeNotificationIdFor(item.id))) {
+          await instance._cancelNotificationId(response.id!);
+        }
         if (!_responseController.isClosed) _responseController.add(response);
         break;
       case _snoozeAction:
         final item = await repository.getItemById(itemId);
         if (item != null) await instance._scheduleSnooze(item);
+        // Do not publish this response: the UI resync would cancel the
+        // independent one-time snooze while restoring the recurring schedule.
         break;
       case _addNoteAction:
       default:
@@ -293,16 +314,20 @@ class ReminderNotificationService {
     }
   }
 
+  Future<void> snooze(RoutineItem item) => _scheduleSnooze(item);
+
   Future<void> _scheduleSnooze(RoutineItem item) async {
     await initialize();
     if (!_initialized || kIsWeb) return;
     final scheduledDate = tz.TZDateTime.now(
       tz.local,
     ).add(const Duration(minutes: 10));
+    final id = snoozeNotificationIdFor(item.id);
+    await _cancelNotificationId(id);
     await _plugin.zonedSchedule(
-      id: notificationIdFor(item.id),
+      id: id,
       title: item.title,
-      body: 'Snoozed reminder',
+      body: 'Snoozed reminder • 10 minutes',
       scheduledDate: scheduledDate,
       notificationDetails: _notificationDetails(),
       payload: item.id,
@@ -374,13 +399,22 @@ class ReminderNotificationService {
   NotificationDetails _notificationDetails() {
     return const NotificationDetails(
       android: AndroidNotificationDetails(
-        'routine_reminders',
-        'Routine reminders',
-        channelDescription: 'Scheduled routine items and preparation alerts',
-        importance: Importance.high,
-        priority: Priority.high,
+        _channelId,
+        'Routine alarms',
+        channelDescription:
+            'Scheduled routine items and preparation alerts with sound',
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: true,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        enableVibration: true,
         actions: [
-          AndroidNotificationAction(_doneAction, 'Done'),
+          AndroidNotificationAction(
+            _doneAction,
+            'Done',
+            cancelNotification: true,
+            semanticAction: SemanticAction.markAsRead,
+          ),
           AndroidNotificationAction(
             _snoozeAction,
             'Snooze 10m',
@@ -393,9 +427,25 @@ class ReminderNotificationService {
           ),
         ],
       ),
-      iOS: DarwinNotificationDetails(categoryIdentifier: _category),
-      macOS: DarwinNotificationDetails(categoryIdentifier: _category),
+      iOS: DarwinNotificationDetails(
+        categoryIdentifier: _category,
+        presentSound: true,
+        sound: 'default',
+      ),
+      macOS: DarwinNotificationDetails(
+        categoryIdentifier: _category,
+        presentSound: true,
+        sound: 'default',
+      ),
     );
+  }
+
+  Future<void> _cancelNotificationId(int id) async {
+    try {
+      await _plugin.cancel(id: id);
+    } catch (error) {
+      debugPrint('Reminder cancellation failed: $error');
+    }
   }
 
   String _notificationBody(RoutineItem item) {

@@ -588,6 +588,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
+  Future<void> _snoozeItem(RoutineItem item) async {
+    if (!item.notificationsEnabled || item.isCompleted) return;
+    await _reminders.snooze(item);
+    final pendingCount = await _reminders.pendingCount();
+    if (!mounted) return;
+    setState(() => _pendingReminderCount = pendingCount);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Reminder snoozed for 10 minutes.')),
+    );
+  }
+
   Future<void> _showItemActions(RoutineItem item) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -599,6 +610,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (!_isCompletedOnDate(item, _selectedDate))
+                ListTile(
+                  leading: const Icon(Icons.check_circle_outline),
+                  title: const Text('Mark Done'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await _setItemCompletion(
+                      item,
+                      true,
+                      occurrenceDate: _selectedDate,
+                    );
+                  },
+                ),
+              if (item.notificationsEnabled &&
+                  !_isCompletedOnDate(item, _selectedDate))
+                ListTile(
+                  leading: const Icon(Icons.snooze),
+                  title: const Text('Snooze 10 minutes'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await _snoozeItem(item);
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.edit),
                 title: const Text('Edit'),
@@ -767,8 +801,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           child: Text('Finance'),
                         ),
                       ],
-                      onChanged: (val) =>
-                          setSheetState(() => category = val!),
+                      onChanged: (val) => setSheetState(() => category = val!),
                     ),
                     const SizedBox(height: 20),
                     SizedBox(

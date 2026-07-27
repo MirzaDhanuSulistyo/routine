@@ -92,5 +92,9 @@ void main() {
       ReminderNotificationService.notificationIdFor('reminder-1'),
       isNot(ReminderNotificationService.notificationIdFor('reminder-2')),
     );
+    expect(
+      ReminderNotificationService.snoozeNotificationIdFor('reminder-1'),
+      isNot(ReminderNotificationService.notificationIdFor('reminder-1')),
+    );
   });
 }
