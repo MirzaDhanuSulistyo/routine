@@ -115,7 +115,9 @@ class ReminderNotificationService {
               await android?.requestNotificationsPermission() ?? true;
           final exactAlarms =
               await android?.requestExactAlarmsPermission() ?? true;
-          return notifications && exactAlarms;
+          final fullScreen =
+              await android?.requestFullScreenIntentPermission() ?? true;
+          return notifications && exactAlarms && fullScreen;
         case TargetPlatform.iOS:
           return await _plugin
                   .resolvePlatformSpecificImplementation<
@@ -405,6 +407,8 @@ class ReminderNotificationService {
             'Scheduled routine items and preparation alerts with sound',
         importance: Importance.max,
         priority: Priority.max,
+        category: AndroidNotificationCategory.alarm,
+        fullScreenIntent: true,
         playSound: true,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         enableVibration: true,
@@ -429,11 +433,20 @@ class ReminderNotificationService {
       ),
       iOS: DarwinNotificationDetails(
         categoryIdentifier: _category,
+        // iOS cannot open an arbitrary full-screen alarm UI, but an active
+        // notification lights the lock screen and plays the system alert.
+        presentAlert: true,
+        presentBanner: true,
+        presentList: true,
         presentSound: true,
+        interruptionLevel: InterruptionLevel.active,
         sound: 'default',
       ),
       macOS: DarwinNotificationDetails(
         categoryIdentifier: _category,
+        presentAlert: true,
+        presentBanner: true,
+        presentList: true,
         presentSound: true,
         sound: 'default',
       ),

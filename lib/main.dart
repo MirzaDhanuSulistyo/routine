@@ -86,6 +86,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   StreamSubscription? _notificationSubscription;
   int _pendingReminderCount = 0;
   bool _isLoading = true;
+  String? _pendingAlarmItemId;
 
   @override
   void initState() {
@@ -94,6 +95,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       if (!mounted) return;
       if (response.actionId == 'routine_add_note') {
         _showFastLogSheet();
+      } else if (response.actionId.isEmpty && response.payload != null) {
+        // A full-screen notification is delivered as a normal tap response.
+        // Show the alarm controls instead of dropping the user on the home page.
+        final item = _items.cast<RoutineItem?>().firstWhere(
+          (entry) => entry?.id == response.payload,
+          orElse: () => null,
+        );
+        if (item != null) {
+          unawaited(_showAlarmReminder(item));
+        } else {
+          _pendingAlarmItemId = response.payload;
+          unawaited(_loadItems());
+        }
       } else {
         _loadItems();
       }
@@ -124,6 +138,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         });
         widget.onItemsLoaded?.call(_items);
         debugPrint('LOADED SQLITE ITEMS: ${_items.length}');
+        final pendingAlarmId = _pendingAlarmItemId;
+        if (pendingAlarmId != null) {
+          final pendingItem = _items.cast<RoutineItem?>().firstWhere(
+            (entry) => entry?.id == pendingAlarmId,
+            orElse: () => null,
+          );
+          _pendingAlarmItemId = null;
+          if (pendingItem != null) unawaited(_showAlarmReminder(pendingItem));
+        }
         unawaited(_syncReminders(_items));
       }
     } catch (e) {
@@ -596,6 +619,47 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     setState(() => _pendingReminderCount = pendingCount);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Reminder snoozed for 10 minutes.')),
+    );
+  }
+
+  Future<void> _showAlarmReminder(RoutineItem item) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.alarm, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 10),
+            const Text('Routine alarm'),
+          ],
+        ),
+        content: Text(
+          item.title,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _snoozeItem(item);
+            },
+            child: const Text('Snooze 10m'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _setItemCompletion(
+                item,
+                true,
+                occurrenceDate: DateTime.now(),
+              );
+            },
+            child: const Text('Stop'),
+          ),
+        ],
+      ),
     );
   }
 
