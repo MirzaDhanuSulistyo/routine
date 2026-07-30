@@ -17,6 +17,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -76,11 +77,14 @@ class RoutineAlarmService : Service() {
     }
 
     private fun startAlertForPhoneMode() {
+        // Alarm vibration is deliberately independent of the ringer switch.
+        // This gives every active alarm a repeating physical alert, including
+        // when the phone is in Normal or Silent mode.
+        startVibration()
+
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        when (audioManager.ringerMode) {
-            AudioManager.RINGER_MODE_NORMAL -> startRingtone()
-            AudioManager.RINGER_MODE_VIBRATE -> startVibration()
-            AudioManager.RINGER_MODE_SILENT -> Unit
+        if (audioManager.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+            startRingtone()
         }
     }
 
@@ -99,9 +103,7 @@ class RoutineAlarmService : Service() {
         } catch (_: Exception) {
             mediaPlayer?.release()
             mediaPlayer = null
-            // A visible, vibrating alarm is safer than a silent failure when a
-            // manufacturer exposes an unreadable alarm-tone URI.
-            startVibration()
+            // Vibration was already started before attempting the ringtone.
         }
     }
 
@@ -115,7 +117,13 @@ class RoutineAlarmService : Service() {
         val alarmVibrator = vibrator ?: return
         if (!alarmVibrator.hasVibrator()) return
         val pattern = longArrayOf(0, 700, 500)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            alarmVibrator.vibrate(
+                VibrationEffect.createWaveform(pattern, 0),
+                VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM),
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            @Suppress("DEPRECATION")
             alarmVibrator.vibrate(
                 VibrationEffect.createWaveform(pattern, 0),
                 alarmAudioAttributes(),

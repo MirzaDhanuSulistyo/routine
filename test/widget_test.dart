@@ -105,6 +105,10 @@ void main() {
     expect(find.text('Leave for work'), findsOneWidget);
     expect(find.text('Snooze 10m'), findsOneWidget);
     expect(find.text('Stop'), findsOneWidget);
+    expect(
+      find.text('Always vibrates • sound follows your phone setting'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Stop'));
     await tester.pump();

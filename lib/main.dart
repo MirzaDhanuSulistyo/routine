@@ -2239,7 +2239,7 @@ class _RoutineAlarmScreenState extends State<RoutineAlarmScreen> {
               ),
               const Spacer(),
               Text(
-                'Sound and vibration follow your phone setting',
+                'Always vibrates • sound follows your phone setting',
                 textAlign: TextAlign.center,
                 style: Theme.of(
                   context,

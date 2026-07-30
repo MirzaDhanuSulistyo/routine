@@ -26,7 +26,7 @@
 - Reminder cancellation and rescheduling after item mutations
 - Timezone-aware Android/iOS reminder scheduling
 - Native Android exact alarms that survive app termination and device reboot
-- Android foreground ringing/vibration service using the phone's ringer mode
+- Android foreground alarm service with forced repeating vibration and ringer-mode-aware sound
 - Full-screen Android lock-screen alarm UI with Stop and Snooze controls
 - iOS time-sensitive notifications with system sound (within platform limits)
 - Preparation lead-time alerts
