@@ -76,6 +76,44 @@ void main() {
     expect(find.text('Unit Label'), findsNothing);
   });
 
+  testWidgets('alarm screen is full-screen and exposes stop and snooze', (
+    WidgetTester tester,
+  ) async {
+    var stopped = false;
+    var snoozed = false;
+    final item = RoutineItem(
+      id: 'alarm-screen',
+      title: 'Leave for work',
+      itemType: 'reminder',
+      category: 'work',
+      timeOfDay: 'morning',
+      scheduledTime: '08:00 AM',
+      notificationsEnabled: true,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RoutineAlarmScreen(
+          item: item,
+          onSnooze: () async => snoozed = true,
+          onStop: () async => stopped = true,
+        ),
+      ),
+    );
+
+    expect(find.text('ROUTINE ALARM'), findsOneWidget);
+    expect(find.text('Leave for work'), findsOneWidget);
+    expect(find.text('Snooze 10m'), findsOneWidget);
+    expect(find.text('Stop'), findsOneWidget);
+
+    await tester.tap(find.text('Stop'));
+    await tester.pump();
+    expect(stopped, isTrue);
+    expect(snoozed, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('timeline item exposes edit and delete dialogs', (
     WidgetTester tester,
   ) async {

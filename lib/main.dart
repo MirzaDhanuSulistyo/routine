@@ -87,17 +87,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _pendingReminderCount = 0;
   bool _isLoading = true;
   String? _pendingAlarmItemId;
+  Route<void>? _activeAlarmRoute;
+  String? _activeAlarmItemId;
 
   @override
   void initState() {
     super.initState();
     _notificationSubscription = _reminders.responses.listen((response) {
       if (!mounted) return;
-      if (response.actionId == 'routine_add_note') {
+      final actionId = response.actionId ?? '';
+      if (actionId == alarmStoppedAction) {
+        _dismissAlarmReminder(response.payload);
+      } else if (actionId == 'routine_add_note') {
         _showFastLogSheet();
-      } else if (response.actionId.isEmpty && response.payload != null) {
-        // A full-screen notification is delivered as a normal tap response.
-        // Show the alarm controls instead of dropping the user on the home page.
+      } else if (actionId.isEmpty && response.payload != null) {
         final item = _items.cast<RoutineItem?>().firstWhere(
           (entry) => entry?.id == response.payload,
           orElse: () => null,
@@ -499,7 +502,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Notify me'),
                       subtitle: const Text(
-                        'Done, Snooze 10m, and Add Note actions',
+                        'Full-screen alarm with Stop and Snooze controls',
                       ),
                       value: notificationsEnabled,
                       onChanged: (value) =>
@@ -592,7 +595,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         ScaffoldMessenger.of(this.context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Item created, but notification permission was not granted.',
+                              'Item created, but alarm permissions were not fully granted.',
                             ),
                           ),
                         );
@@ -623,44 +626,49 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Future<void> _showAlarmReminder(RoutineItem item) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.alarm, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 10),
-            const Text('Routine alarm'),
-          ],
-        ),
-        content: Text(
-          item.title,
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _snoozeItem(item);
-            },
-            child: const Text('Snooze 10m'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _setItemCompletion(
-                item,
-                true,
-                occurrenceDate: DateTime.now(),
-              );
-            },
-            child: const Text('Stop'),
-          ),
-        ],
+    if (!mounted || _activeAlarmItemId == item.id) return;
+    _dismissAlarmReminder();
+
+    late final Route<void> route;
+    route = MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => RoutineAlarmScreen(
+        item: item,
+        onSnooze: () async {
+          _dismissAlarmReminder(item.id);
+          await _snoozeItem(item);
+        },
+        onStop: () async {
+          _dismissAlarmReminder(item.id);
+          await _reminders.stopAlarm(item.id);
+          final occurrenceDate = DateTime.tryParse(
+            ReminderNotificationService.occurrenceDateForAction(item),
+          );
+          await _setItemCompletion(
+            item,
+            true,
+            occurrenceDate: occurrenceDate ?? DateTime.now(),
+          );
+        },
       ),
     );
+    _activeAlarmRoute = route;
+    _activeAlarmItemId = item.id;
+    await Navigator.of(context, rootNavigator: true).push(route);
+    if (identical(_activeAlarmRoute, route)) {
+      _activeAlarmRoute = null;
+      _activeAlarmItemId = null;
+    }
+  }
+
+  void _dismissAlarmReminder([String? itemId]) {
+    final route = _activeAlarmRoute;
+    if (route == null || (itemId != null && itemId != _activeAlarmItemId)) {
+      return;
+    }
+    _activeAlarmRoute = null;
+    _activeAlarmItemId = null;
+    route.navigator?.removeRoute(route);
   }
 
   Future<void> _showItemActions(RoutineItem item) async {
@@ -1825,7 +1833,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Native Reminders',
+                  'Native Alarms',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
@@ -1834,7 +1842,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '$_pendingReminderCount pending notification${_pendingReminderCount == 1 ? '' : 's'} • Done, Snooze, Add Note',
+                  '$_pendingReminderCount pending alarm${_pendingReminderCount == 1 ? '' : 's'} • full-screen Stop and Snooze',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
@@ -1843,7 +1851,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.notifications_active, size: 16),
-                  label: const Text('Enable Notification Permissions'),
+                  label: const Text('Enable Alarm Permissions'),
                   onPressed: () async {
                     final granted = await _reminders.requestPermissions();
                     if (!mounted) return;
@@ -1851,8 +1859,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       SnackBar(
                         content: Text(
                           granted
-                              ? 'Notification permissions are enabled.'
-                              : 'Notification permission was not granted.',
+                              ? 'Alarm permissions are enabled.'
+                              : 'Alarm permissions were not fully granted.',
                         ),
                       ),
                     );
@@ -2114,6 +2122,162 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'Settings',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class RoutineAlarmScreen extends StatefulWidget {
+  const RoutineAlarmScreen({
+    super.key,
+    required this.item,
+    required this.onSnooze,
+    required this.onStop,
+  });
+
+  final RoutineItem item;
+  final Future<void> Function() onSnooze;
+  final Future<void> Function() onStop;
+
+  @override
+  State<RoutineAlarmScreen> createState() => _RoutineAlarmScreenState();
+}
+
+class _RoutineAlarmScreenState extends State<RoutineAlarmScreen> {
+  late DateTime _now = DateTime.now();
+  Timer? _clockTimer;
+  bool _handlingAction = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
+  String get _clockTime {
+    final period = _now.hour >= 12 ? 'PM' : 'AM';
+    final hour = _now.hour % 12 == 0 ? 12 : _now.hour % 12;
+    return '$hour:${_now.minute.toString().padLeft(2, '0')} $period';
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_handlingAction) return;
+    setState(() => _handlingAction = true);
+    await action();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: colors.surface,
+        body: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(24, 36, 24, 28),
+          child: Column(
+            children: [
+              Text(
+                'ROUTINE ALARM',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: colors.primary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.4,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                width: 112,
+                height: 112,
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.primary.withValues(alpha: 0.25),
+                      blurRadius: 36,
+                      spreadRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.alarm_rounded,
+                  size: 58,
+                  color: colors.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: 38),
+              Text(
+                _clockTime,
+                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: -2,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                widget.item.title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Scheduled for ${widget.item.scheduledTime}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: colors.onSurfaceVariant),
+              ),
+              const Spacer(),
+              Text(
+                'Sound and vibration follow your phone setting',
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _handlingAction
+                          ? null
+                          : () => _run(widget.onSnooze),
+                      icon: const Icon(Icons.snooze_rounded),
+                      label: const Text('Snooze 10m'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(58),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _handlingAction
+                          ? null
+                          : () => _run(widget.onStop),
+                      icon: const Icon(Icons.stop_rounded),
+                      label: const Text('Stop'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(58),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -29,7 +29,7 @@
 | `lib/presentation/` | UI screens, theme toggle, fast log modals, pattern reports | `andura_ui`, `lib/domain/` |
 | `lib/domain/` | `RoutineItem`, `TimelineSlot`, `AnomalyPattern`, 3-layer business rules | None (Pure Dart) |
 | `lib/data/` | SQLite database schema, repositories, secure storage | `sqflite`, `lib/domain/` |
-| `lib/services/` | Local scheduled notifications, finite RSS briefing fetcher | `flutter_local_notifications`, `http` |
+| `lib/services/` | Cross-platform reminder bridge, native Android alarm scheduling, finite RSS briefing fetcher | `flutter_local_notifications`, Android `AlarmManager`, `http` |
 
 ## State and data flow
 
@@ -52,8 +52,8 @@ On data change, `Evaluate7DayPatternsUseCase` triggers in background to update `
 
 ## Platform integration
 
-- **iOS**: `UNUserNotificationCenter` for scheduled lead-time notifications; background fetch via `workmanager`.
-- **Android**: `AlarmManager` for exact lead-time reminders; `NotificationChannel` support.
+- **iOS**: `UNUserNotificationCenter` time-sensitive notifications with system sound; iOS does not allow arbitrary third-party lock-screen alarm activities.
+- **Android**: Native `AlarmManager` exact scheduling, reboot restoration, a foreground media service for looping alarm tone/vibration, and a full-screen lock-screen intent.
 
 ## Security and privacy
 
@@ -77,7 +77,7 @@ On data change, `Evaluate7DayPatternsUseCase` triggers in background to update `
 |---|---|---|---|
 | `andura_ui` | Design system tokens & components | Cross-platform contract requirement | Core dependency |
 | `sqflite` | SQLite local database | Reliable cross-platform local SQL storage | Standard Flutter package |
-| `flutter_local_notifications` | Timed reminders & lead-time alerts | Precise native notification scheduling | Native wrapper |
+| `flutter_local_notifications` | iOS/macOS reminders and Android permission/fallback notifications | Precise native notification scheduling | Android ringing uses the app's native alarm bridge |
 
 ## Architecture decisions
 

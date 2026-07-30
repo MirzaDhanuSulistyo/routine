@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -13,6 +14,8 @@ import '../domain/routine_item.dart';
 const _doneAction = 'routine_done';
 const _snoozeAction = 'routine_snooze';
 const _addNoteAction = 'routine_add_note';
+const alarmStoppedAction = 'routine_alarm_stopped';
+const _nativeAlarmChannel = MethodChannel('io.andura.routine/alarm');
 // Use a new channel ID so Android devices that created the old channel can
 // receive the sound settings below. Android does not update channel sound
 // settings after a channel has been created.
@@ -95,10 +98,79 @@ class ReminderNotificationService {
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
       _initialized = true;
+      await _configureLaunchHandling();
     } catch (error) {
       debugPrint('Notification initialization unavailable: $error');
     }
   }
+
+  Future<void> _configureLaunchHandling() async {
+    if (_usesNativeAndroidAlarms) {
+      try {
+        _nativeAlarmChannel.setMethodCallHandler(_handleNativeAlarmCall);
+        final active = await _nativeAlarmChannel
+            .invokeMapMethod<String, dynamic>('getActiveAlarm');
+        if (active != null) _publishNativeAlarm(active);
+      } catch (error) {
+        debugPrint('Native alarm launch handling unavailable: $error');
+      }
+    }
+
+    // initialize() deliberately does not invoke the response callback when a
+    // notification cold-started the app. Read and publish that launch here.
+    try {
+      final launch = await _plugin.getNotificationAppLaunchDetails();
+      final response = launch?.notificationResponse;
+      if (launch?.didNotificationLaunchApp == true && response != null) {
+        if (!_responseController.isClosed) _responseController.add(response);
+      }
+    } catch (error) {
+      debugPrint('Notification launch handling unavailable: $error');
+    }
+  }
+
+  Future<dynamic> _handleNativeAlarmCall(MethodCall call) async {
+    final arguments = Map<String, dynamic>.from(
+      (call.arguments as Map?) ?? const <String, dynamic>{},
+    );
+    switch (call.method) {
+      case 'alarmTriggered':
+        _publishNativeAlarm(arguments);
+        return null;
+      case 'alarmStopped':
+        if (!_responseController.isClosed) {
+          _responseController.add(
+            NotificationResponse(
+              notificationResponseType:
+                  NotificationResponseType.selectedNotificationAction,
+              actionId: alarmStoppedAction,
+              payload: arguments['itemId']?.toString(),
+            ),
+          );
+        }
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  void _publishNativeAlarm(Map<String, dynamic> arguments) {
+    final itemId = arguments['itemId']?.toString();
+    if (itemId == null || itemId.isEmpty || _responseController.isClosed) {
+      return;
+    }
+    _responseController.add(
+      NotificationResponse(
+        notificationResponseType: NotificationResponseType.selectedNotification,
+        id: (arguments['notificationId'] as num?)?.toInt(),
+        actionId: '',
+        payload: itemId,
+      ),
+    );
+  }
+
+  bool get _usesNativeAndroidAlarms =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   Future<bool> requestPermissions() async {
     await initialize();
@@ -149,17 +221,28 @@ class ReminderNotificationService {
 
     final schedule = scheduleFor(item, now: now);
     if (schedule == null) {
-      await cancel(item.id);
+      await initialize();
+      if (_usesNativeAndroidAlarms) {
+        // A one-time alarm may currently be ringing. Remove only future alarm
+        // manager entries; do not silence the active alarm during app startup.
+        await _cancelNativeScheduled(item.id);
+      } else {
+        await cancel(item.id);
+      }
       return;
     }
 
     await initialize();
     if (!_initialized || kIsWeb) return;
 
+    final id = notificationIdFor(item.id);
+    if (_usesNativeAndroidAlarms &&
+        await _scheduleNativeAndroidAlarm(item, schedule)) {
+      return;
+    }
+
     final scheduledDate = tz.TZDateTime.from(schedule.dateTime, tz.local);
     final notificationDetails = _notificationDetails();
-    final id = notificationIdFor(item.id);
-
     await _cancelNotificationId(id);
     await _cancelNotificationId(snoozeNotificationIdFor(item.id));
     try {
@@ -194,6 +277,74 @@ class ReminderNotificationService {
     }
   }
 
+  Future<bool> _scheduleNativeAndroidAlarm(
+    RoutineItem item,
+    ReminderSchedule schedule,
+  ) async {
+    try {
+      final active = await _isNativeAlarmActive(item.id);
+      if (!active) {
+        // Remove schedules created by older app versions that used only the
+        // notifications plugin. Never cancel an active foreground alarm.
+        await _cancelNotificationId(notificationIdFor(item.id));
+      }
+      await _cancelNativeScheduled(item.id);
+      await _nativeAlarmChannel.invokeMethod<void>(
+        'scheduleAlarm',
+        _nativeAlarmArguments(
+          item,
+          notificationId: notificationIdFor(item.id),
+          triggerAt: schedule.dateTime,
+          recurrence: item.recurrenceRule,
+        ),
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Native Android alarm scheduling unavailable: $error');
+      return false;
+    }
+  }
+
+  Map<String, dynamic> _nativeAlarmArguments(
+    RoutineItem item, {
+    required int notificationId,
+    required DateTime triggerAt,
+    required String recurrence,
+  }) {
+    return <String, dynamic>{
+      'notificationId': notificationId,
+      'snoozeNotificationId': snoozeNotificationIdFor(item.id),
+      'itemId': item.id,
+      'title': item.title,
+      'body': _notificationBody(item),
+      'triggerAtMillis': triggerAt.millisecondsSinceEpoch,
+      'recurrence': recurrence,
+    };
+  }
+
+  Future<void> _cancelNativeScheduled(String itemId) async {
+    try {
+      await _nativeAlarmChannel.invokeMethod<void>('cancelScheduledAlarm', {
+        'notificationId': notificationIdFor(itemId),
+        'snoozeNotificationId': snoozeNotificationIdFor(itemId),
+        'includeSnooze': false,
+      });
+    } catch (error) {
+      debugPrint('Native scheduled-alarm cancellation unavailable: $error');
+    }
+  }
+
+  Future<bool> _isNativeAlarmActive(String itemId) async {
+    try {
+      return await _nativeAlarmChannel.invokeMethod<bool>('isAlarmActive', {
+            'itemId': itemId,
+          }) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> rescheduleAll(List<RoutineItem> items) async {
     await initialize();
     for (final item in items.where((item) => item.notificationsEnabled)) {
@@ -204,14 +355,45 @@ class ReminderNotificationService {
   Future<void> cancel(String itemId) async {
     if (!_initialized) await initialize();
     if (!_initialized || kIsWeb) return;
+    if (_usesNativeAndroidAlarms) {
+      try {
+        await _nativeAlarmChannel.invokeMethod<void>('cancelAlarm', {
+          'notificationId': notificationIdFor(itemId),
+          'snoozeNotificationId': snoozeNotificationIdFor(itemId),
+          'itemId': itemId,
+        });
+      } catch (error) {
+        debugPrint('Native alarm cancellation unavailable: $error');
+      }
+    }
     await _cancelNotificationId(notificationIdFor(itemId));
     await _cancelNotificationId(snoozeNotificationIdFor(itemId));
+  }
+
+  Future<void> stopAlarm(String itemId) async {
+    await initialize();
+    if (!_initialized || kIsWeb) return;
+    if (_usesNativeAndroidAlarms) {
+      try {
+        await _nativeAlarmChannel.invokeMethod<void>('stopAlarm', {
+          'itemId': itemId,
+        });
+      } catch (error) {
+        debugPrint('Native ringing-alarm stop unavailable: $error');
+      }
+    }
   }
 
   Future<int> pendingCount() async {
     await initialize();
     if (!_initialized || kIsWeb) return 0;
     try {
+      if (_usesNativeAndroidAlarms) {
+        return await _nativeAlarmChannel.invokeMethod<int>(
+              'pendingAlarmCount',
+            ) ??
+            0;
+      }
       return (await _plugin.pendingNotificationRequests()).length;
     } catch (_) {
       return 0;
@@ -271,7 +453,7 @@ class ReminderNotificationService {
       hash ^= unit;
       hash = (hash * 0x01000193) & 0x7fffffff;
     }
-    return hash;
+    return hash == 0 ? 1 : hash;
   }
 
   static Future<void> handleResponse(NotificationResponse response) async {
@@ -321,10 +503,25 @@ class ReminderNotificationService {
   Future<void> _scheduleSnooze(RoutineItem item) async {
     await initialize();
     if (!_initialized || kIsWeb) return;
-    final scheduledDate = tz.TZDateTime.now(
-      tz.local,
-    ).add(const Duration(minutes: 10));
+    final triggerAt = DateTime.now().add(const Duration(minutes: 10));
     final id = snoozeNotificationIdFor(item.id);
+    if (_usesNativeAndroidAlarms) {
+      final arguments = _nativeAlarmArguments(
+        item,
+        notificationId: id,
+        triggerAt: triggerAt,
+        recurrence: 'none',
+      );
+      arguments['body'] = 'Snoozed alarm • 10 minutes';
+      try {
+        await _nativeAlarmChannel.invokeMethod<void>('snoozeAlarm', arguments);
+        return;
+      } catch (error) {
+        debugPrint('Native alarm snooze unavailable: $error');
+      }
+    }
+
+    final scheduledDate = tz.TZDateTime.from(triggerAt, tz.local);
     await _cancelNotificationId(id);
     await _plugin.zonedSchedule(
       id: id,
@@ -439,7 +636,7 @@ class ReminderNotificationService {
         presentBanner: true,
         presentList: true,
         presentSound: true,
-        interruptionLevel: InterruptionLevel.active,
+        interruptionLevel: InterruptionLevel.timeSensitive,
         sound: 'default',
       ),
       macOS: DarwinNotificationDetails(

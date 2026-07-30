@@ -24,10 +24,14 @@
 - Daily and weekly recurring timeline projection
 - Item editing and confirmed deletion with cascading history cleanup
 - Reminder cancellation and rescheduling after item mutations
-- Timezone-aware Android/iOS notification scheduling
+- Timezone-aware Android/iOS reminder scheduling
+- Native Android exact alarms that survive app termination and device reboot
+- Android foreground ringing/vibration service using the phone's ringer mode
+- Full-screen Android lock-screen alarm UI with Stop and Snooze controls
+- iOS time-sensitive notifications with system sound (within platform limits)
 - Preparation lead-time alerts
-- Notification actions for Done, Snooze 10m, and Add Note
-- Runtime notification permission controls and pending-reminder status
+- Notification/alarm actions for Done, Stop, Snooze 10m, and Add Note
+- Runtime notification, exact-alarm, and full-screen permission controls
 - Finite source-filtered demo briefing cards
 - Basic local schedule variance analysis
 - Functional seed-data restore
