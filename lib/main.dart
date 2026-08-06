@@ -11,6 +11,20 @@ import 'services/reminder_notification_service.dart';
 
 export 'domain/routine_item.dart';
 
+/// Weekday display order from Sunday through Saturday using Dart's
+/// `DateTime.weekday` numbering (Monday = 1 ... Sunday = 7).
+const List<int> _weekdayOrder = [7, 1, 2, 3, 4, 5, 6];
+const Map<int, String> _weekdayShort = {
+  7: 'Sun',
+  1: 'Mon',
+  2: 'Tue',
+  3: 'Wed',
+  4: 'Thu',
+  5: 'Fri',
+  6: 'Sat',
+};
+const List<int> _allWeekdays = [1, 2, 3, 4, 5, 6, 7];
+
 void main() {
   runApp(const RoutineApp());
 }
@@ -85,6 +99,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Map<String, RoutineOccurrence> _occurrences = {};
   StreamSubscription? _notificationSubscription;
   int _pendingReminderCount = 0;
+  bool? _alarmPermissionsGranted;
   bool _isLoading = true;
   String? _pendingAlarmItemId;
   Route<void>? _activeAlarmRoute;
@@ -172,6 +187,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     await _reminders.rescheduleAll(items);
     final pendingCount = await _reminders.pendingCount();
     if (mounted) setState(() => _pendingReminderCount = pendingCount);
+    await _refreshAlarmPermissions();
+  }
+
+  Future<void> _refreshAlarmPermissions() async {
+    final granted = await _reminders.hasPermission();
+    if (mounted) setState(() => _alarmPermissionsGranted = granted);
   }
 
   Color _getCategoryColor(String cat) {
@@ -228,6 +249,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return '$hour:$minute ${time.period == DayPeriod.am ? 'AM' : 'PM'}';
   }
 
+  String _recurrenceLabel(RoutineItem item) {
+    switch (item.recurrenceRule) {
+      case 'daily':
+        final days = item.repeatDays;
+        if (days == null || days.isEmpty || days.length >= 7) {
+          return 'Repeats daily';
+        }
+        final names = _weekdayOrder
+            .where(days.contains)
+            .map((day) => _weekdayShort[day])
+            .join(', ');
+        return 'Repeats on $names';
+      case 'weekly':
+        return 'Repeats weekly';
+      case 'monthly':
+        return 'Repeats monthly';
+      default:
+        return '';
+    }
+  }
+
+  String _ordinal(int value) {
+    final lastDigit = value % 10;
+    final lastTwo = value % 100;
+    if (lastTwo >= 11 && lastTwo <= 13) return '${value}th';
+    return switch (lastDigit) {
+      1 => '${value}st',
+      2 => '${value}nd',
+      3 => '${value}rd',
+      _ => '${value}th',
+    };
+  }
+
   String _formatTimestamp(String value) {
     final parsed = DateTime.tryParse(value);
     if (parsed == null) return value;
@@ -246,19 +300,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return items;
   }
 
-  bool _occursOnDate(RoutineItem item, DateTime date) {
-    final start = DateTime.tryParse(item.scheduledDate ?? '');
-    if (start == null) return false;
-    final target = DateTime(date.year, date.month, date.day);
-    final first = DateTime(start.year, start.month, start.day);
-    if (target.isBefore(first)) return false;
-    final dayDifference = target.difference(first).inDays;
-    return switch (item.recurrenceRule) {
-      'daily' => true,
-      'weekly' => dayDifference % 7 == 0,
-      _ => dayDifference == 0,
-    };
-  }
+  bool _occursOnDate(RoutineItem item, DateTime date) =>
+      item.occursOnDate(date);
 
   bool _isCompletedOnDate(RoutineItem item, DateTime date) {
     if (item.recurrenceRule == 'none') return item.isCompleted;
@@ -347,6 +390,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     var category = existingItem?.category ?? 'personal';
     var recurrenceRule = existingItem?.recurrenceRule ?? 'none';
     var notificationsEnabled = existingItem?.notificationsEnabled ?? false;
+    var repeatDays = existingItem?.repeatDays != null
+        ? List<int>.from(existingItem!.repeatDays!)
+        : List<int>.from(_allWeekdays);
     var date =
         DateTime.tryParse(existingItem?.scheduledDate ?? '') ?? _selectedDate;
     final initialMinutes = existingItem == null
@@ -489,15 +535,83 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           value: 'none',
                           child: Text('Does not repeat'),
                         ),
-                        DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                        DropdownMenuItem(
+                          value: 'daily',
+                          child: Text('Daily (choose days)'),
+                        ),
                         DropdownMenuItem(
                           value: 'weekly',
                           child: Text('Weekly'),
                         ),
+                        DropdownMenuItem(
+                          value: 'monthly',
+                          child: Text('Monthly'),
+                        ),
                       ],
-                      onChanged: (value) =>
-                          setDialogState(() => recurrenceRule = value!),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          recurrenceRule = value!;
+                          if (recurrenceRule == 'daily' && repeatDays.isEmpty) {
+                            repeatDays = List<int>.from(_allWeekdays);
+                          }
+                        });
+                      },
                     ),
+                    if (recurrenceRule == 'daily') ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Repeat on',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _weekdayOrder.map((day) {
+                          final selected = repeatDays.contains(day);
+                          return FilterChip(
+                            label: Text(_weekdayShort[day]!),
+                            selected: selected,
+                            onSelected: (value) {
+                              setDialogState(() {
+                                if (value) {
+                                  if (!repeatDays.contains(day)) {
+                                    repeatDays.add(day);
+                                  }
+                                } else if (repeatDays.length > 1) {
+                                  repeatDays.remove(day);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                    if (recurrenceRule == 'monthly') ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Repeats on the ${_ordinal(date.day)} of every '
+                          'month at ${_formatTime(time)}.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Notify me'),
@@ -554,6 +668,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         scheduledTime: _formatTime(time),
                         scheduledDate: _dateKey(date),
                         recurrenceRule: recurrenceRule,
+                        repeatDays:
+                            recurrenceRule == 'daily' && repeatDays.length < 7
+                            ? List<int>.from(repeatDays)
+                            : null,
                         notificationsEnabled: canNotify,
                         eventTimestamp: existingItem?.eventTimestamp,
                         recordedAtTimestamp: existingItem?.recordedAtTimestamp,
@@ -600,6 +718,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           ),
                         );
                       }
+                      unawaited(_refreshAlarmPermissions());
                     },
                     child: Text(
                       existingItem == null ? 'Create Item' : 'Save Changes',
@@ -1448,9 +1567,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       children: [
                         if (item.recurrenceRule != 'none')
                           AnduraBadge(
-                            label: item.recurrenceRule == 'daily'
-                                ? 'Repeats daily'
-                                : 'Repeats weekly',
+                            label: _recurrenceLabel(item),
                             color: Theme.of(
                               context,
                             ).colorScheme.secondaryContainer,
@@ -1849,23 +1966,43 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.notifications_active, size: 16),
-                  label: const Text('Enable Alarm Permissions'),
-                  onPressed: () async {
-                    final granted = await _reminders.requestPermissions();
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          granted
-                              ? 'Alarm permissions are enabled.'
-                              : 'Alarm permissions were not fully granted.',
+                if (_alarmPermissionsGranted == true)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Alarm permissions are enabled',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ],
+                  )
+                else
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.notifications_active, size: 16),
+                    label: const Text('Enable Alarm Permissions'),
+                    onPressed: () async {
+                      final granted = await _reminders.requestPermissions();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            granted
+                                ? 'Alarm permissions are enabled.'
+                                : 'Alarm permissions were not fully granted.',
+                          ),
+                        ),
+                      );
+                      await _refreshAlarmPermissions();
+                    },
+                  ),
               ],
             ),
           ),
@@ -1898,33 +2035,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.restore, size: 16),
-                  label: const Text('Restore Default Seed Routine Data'),
-                  onPressed: () async {
-                    for (final item in _items) {
-                      await _reminders.cancel(item.id);
-                    }
-                    await _repository.resetToSeedItems(date: _selectedDate);
-                    final items = await _repository.getAllItems();
-                    final pendingCount = await _reminders.pendingCount();
-                    if (mounted) {
-                      setState(() {
-                        _items = items;
-                        _occurrences = {};
-                        _pendingReminderCount = pendingCount;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Routine data restored to the default items.',
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                ),
               ],
             ),
           ),
@@ -1951,7 +2061,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Version 1.0.0 • Zero Cloud Dependency • 100% On-Device Analytics',
+                  'Version 1.1.0 • Zero Cloud Dependency • 100% On-Device Analytics',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,

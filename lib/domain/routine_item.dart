@@ -1,3 +1,7 @@
+/// Weekday numbers use Dart's `DateTime.weekday` convention: Monday = 1
+/// through Sunday = 7. Used by the `daily` recurrence rule to select which
+/// days of the week repeat. A null or empty list means every day (legacy
+/// `daily` behavior).
 class RoutineItem {
   final String id;
   final String title;
@@ -13,6 +17,7 @@ class RoutineItem {
   bool isCompleted;
   final String? notes;
   final int? prepOffsetMinutes;
+  final List<int>? repeatDays;
   final List<String>? topicSources;
   final List<Map<String, String>>? briefStories;
 
@@ -31,9 +36,33 @@ class RoutineItem {
     this.isCompleted = false,
     this.notes,
     this.prepOffsetMinutes,
+    this.repeatDays,
     this.topicSources,
     this.briefStories,
   });
+
+  /// Whether this item is scheduled to occur on the given calendar date.
+  bool occursOnDate(DateTime date) {
+    final start = DateTime.tryParse(scheduledDate ?? '');
+    if (start == null) return false;
+    final target = DateTime(date.year, date.month, date.day);
+    final first = DateTime(start.year, start.month, start.day);
+    if (target.isBefore(first)) return false;
+    final difference = target.difference(first).inDays;
+    return switch (recurrenceRule) {
+      'daily' => _repeatsOnWeekday(target.weekday),
+      'weekly' => difference % 7 == 0,
+      'monthly' => target.day == first.day,
+      _ => difference == 0,
+    };
+  }
+
+  /// Whether the daily recurrence fires on the given weekday.
+  bool _repeatsOnWeekday(int weekday) {
+    final days = repeatDays;
+    if (days == null || days.isEmpty) return true;
+    return days.contains(weekday);
+  }
 
   RoutineItem copyWith({
     String? title,
@@ -49,6 +78,7 @@ class RoutineItem {
     bool? isCompleted,
     String? notes,
     int? prepOffsetMinutes,
+    List<int>? repeatDays,
     List<String>? topicSources,
     List<Map<String, String>>? briefStories,
   }) {
@@ -67,6 +97,7 @@ class RoutineItem {
       isCompleted: isCompleted ?? this.isCompleted,
       notes: notes ?? this.notes,
       prepOffsetMinutes: prepOffsetMinutes ?? this.prepOffsetMinutes,
+      repeatDays: repeatDays ?? this.repeatDays,
       topicSources: topicSources ?? this.topicSources,
       briefStories: briefStories ?? this.briefStories,
     );

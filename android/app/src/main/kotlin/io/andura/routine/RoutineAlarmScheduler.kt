@@ -41,7 +41,9 @@ object RoutineAlarmScheduler {
             ?: return null
         if (stored.itemId != incoming.itemId) return null
 
-        if (stored.recurrence == "daily" || stored.recurrence == "weekly") {
+        if (stored.recurrence == "daily" || stored.recurrence == "weekly" ||
+            stored.recurrence == "monthly"
+        ) {
             val next = nextOccurrence(stored)
             schedule(context, next)
         } else {
@@ -58,7 +60,8 @@ object RoutineAlarmScheduler {
         RoutineAlarmStore.allScheduled(context).forEach { stored ->
             when {
                 stored.triggerAtMillis > now -> arm(context, stored)
-                stored.recurrence == "daily" || stored.recurrence == "weekly" -> {
+                stored.recurrence == "daily" || stored.recurrence == "weekly" ||
+                    stored.recurrence == "monthly" -> {
                     schedule(context, nextOccurrence(stored, now))
                 }
                 now - stored.triggerAtMillis <= MISSED_ALARM_GRACE_MILLIS -> {
@@ -76,12 +79,26 @@ object RoutineAlarmScheduler {
         data: RoutineAlarmData,
         nowMillis: Long = System.currentTimeMillis(),
     ): RoutineAlarmData {
-        val days = if (data.recurrence == "weekly") 7L else 1L
         val zone = ZoneId.systemDefault()
-        var next = Instant.ofEpochMilli(data.triggerAtMillis).atZone(zone).plusDays(days)
         val now = Instant.ofEpochMilli(nowMillis)
-        while (!next.toInstant().isAfter(now)) {
-            next = next.plusDays(days)
+        var next = Instant.ofEpochMilli(data.triggerAtMillis).atZone(zone)
+        val anchorDay = next.dayOfMonth
+        while (true) {
+            next = when (data.recurrence) {
+                "weekly" -> next.plusWeeks(1)
+                "monthly" -> next.plusMonths(1)
+                else -> next.plusDays(1)
+            }
+            if (!next.toInstant().isAfter(now)) continue
+            if (data.recurrence == "daily" && data.repeatDays.isNotEmpty() &&
+                data.repeatDays.none { it == next.dayOfWeek.value }
+            ) {
+                continue
+            }
+            if (data.recurrence == "monthly" && next.dayOfMonth != anchorDay) {
+                continue
+            }
+            break
         }
         return data.copy(triggerAtMillis = next.toInstant().toEpochMilli())
     }

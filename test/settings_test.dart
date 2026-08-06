@@ -28,5 +28,6 @@ void main() {
     expect(find.text('Native Alarms'), findsOneWidget);
     expect(find.text('Local SQLite Database'), findsOneWidget);
     expect(find.text('Enable Alarm Permissions'), findsOneWidget);
+    expect(find.text('Restore Default Seed Routine Data'), findsNothing);
   });
 }

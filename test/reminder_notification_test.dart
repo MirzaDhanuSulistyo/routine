@@ -9,6 +9,7 @@ void main() {
     String time = '08:00 AM',
     String recurrence = 'none',
     int? prepOffset,
+    List<int>? repeatDays,
   }) {
     return RoutineItem(
       id: 'reminder-1',
@@ -21,6 +22,7 @@ void main() {
       recurrenceRule: recurrence,
       notificationsEnabled: true,
       prepOffsetMinutes: prepOffset,
+      repeatDays: repeatDays,
     );
   }
 
@@ -58,6 +60,66 @@ void main() {
     expect(daily.recurrenceComponents, DateTimeComponents.time);
     expect(weekly!.dateTime, DateTime(2026, 7, 27, 8));
     expect(weekly.recurrenceComponents, DateTimeComponents.dayOfWeekAndTime);
+  });
+
+  test('daily repeat with selected days skips unselected weekdays', () {
+    // 2026-07-20 is a Monday. Repeat Tue(2), Thu(4), Sat(6).
+    final schedule = ReminderNotificationService.scheduleFor(
+      reminder(recurrence: 'daily', repeatDays: [2, 4, 6]),
+      now: DateTime(2026, 7, 22, 9),
+    );
+
+    expect(schedule!.dateTime, DateTime(2026, 7, 23, 8));
+    expect(schedule.recurrenceComponents, isNull);
+  });
+
+  test('daily repeat with all days selected uses a repeating component', () {
+    final schedule = ReminderNotificationService.scheduleFor(
+      reminder(recurrence: 'daily', repeatDays: [1, 2, 3, 4, 5, 6, 7]),
+      now: DateTime(2026, 7, 22, 9),
+    );
+
+    expect(schedule!.recurrenceComponents, DateTimeComponents.time);
+  });
+
+  test('advances monthly reminders to the same day next month', () {
+    final schedule = ReminderNotificationService.scheduleFor(
+      reminder(recurrence: 'monthly'),
+      now: DateTime(2026, 8, 5, 9),
+    );
+
+    expect(schedule!.dateTime, DateTime(2026, 8, 20, 8));
+    expect(schedule.recurrenceComponents, DateTimeComponents.dayOfMonthAndTime);
+  });
+
+  test('monthly reminder skips months that lack the anchor day', () {
+    // Anchor day 31 has no occurrence in February.
+    final schedule = ReminderNotificationService.scheduleFor(
+      reminder(date: '2026-01-31', recurrence: 'monthly'),
+      now: DateTime(2026, 2, 10, 9),
+    );
+
+    expect(schedule!.dateTime, DateTime(2026, 3, 31, 8));
+  });
+
+  test('maps daily and monthly actions to their closest occurrence', () {
+    final daily = reminder(recurrence: 'daily', repeatDays: [2, 4, 6]);
+    final monthly = reminder(recurrence: 'monthly');
+
+    expect(
+      ReminderNotificationService.occurrenceDateForAction(
+        daily,
+        now: DateTime(2026, 7, 23, 8),
+      ),
+      '2026-07-23',
+    );
+    expect(
+      ReminderNotificationService.occurrenceDateForAction(
+        monthly,
+        now: DateTime(2026, 8, 20, 8),
+      ),
+      '2026-08-20',
+    );
   });
 
   test('maps a cross-midnight preparation action to its target date', () {

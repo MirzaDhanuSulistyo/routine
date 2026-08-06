@@ -196,6 +196,13 @@ class RoutineRepository {
       );
     }
 
+    List<int>? repeatDays;
+    if (map['repeat_days_json'] != null) {
+      repeatDays = List<int>.from(
+        jsonDecode(map['repeat_days_json'].toString()),
+      );
+    }
+
     List<Map<String, String>>? briefStories;
     if (map['brief_stories_json'] != null) {
       final rawList = jsonDecode(map['brief_stories_json'].toString()) as List;
@@ -223,6 +230,7 @@ class RoutineRepository {
       prepOffsetMinutes: map['prep_offset_minutes'] != null
           ? (map['prep_offset_minutes'] as num).toInt()
           : null,
+      repeatDays: repeatDays,
       topicSources: topicSources,
       briefStories: briefStories,
     );
@@ -244,6 +252,9 @@ class RoutineRepository {
       'is_completed': item.isCompleted ? 1 : 0,
       'notes': item.notes,
       'prep_offset_minutes': item.prepOffsetMinutes,
+      'repeat_days_json': item.repeatDays == null
+          ? null
+          : jsonEncode(item.repeatDays),
       'topic_sources_json': item.topicSources == null
           ? null
           : jsonEncode(item.topicSources),
@@ -358,19 +369,8 @@ class RoutineRepository {
     ];
   }
 
-  bool _occursOnDate(RoutineItem item, DateTime date) {
-    final start = DateTime.tryParse(item.scheduledDate ?? '');
-    if (start == null) return false;
-    final target = DateTime(date.year, date.month, date.day);
-    final first = DateTime(start.year, start.month, start.day);
-    if (target.isBefore(first)) return false;
-    final difference = target.difference(first).inDays;
-    return switch (item.recurrenceRule) {
-      'daily' => true,
-      'weekly' => difference % 7 == 0,
-      _ => difference == 0,
-    };
-  }
+  bool _occursOnDate(RoutineItem item, DateTime date) =>
+      item.occursOnDate(date);
 
   int _compareItems(RoutineItem a, RoutineItem b) {
     final dateComparison = (a.scheduledDate ?? '').compareTo(

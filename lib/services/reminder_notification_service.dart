@@ -213,6 +213,46 @@ class ReminderNotificationService {
     }
   }
 
+  /// Whether the runtime permissions backing reminders are already granted.
+  Future<bool> hasPermission() async {
+    await initialize();
+    if (!_initialized || kIsWeb) return false;
+
+    try {
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.android:
+          final android = _plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+          final notifications =
+              await android?.areNotificationsEnabled() ?? false;
+          final exactAlarms =
+              await android?.canScheduleExactNotifications() ?? false;
+          return notifications && exactAlarms;
+        case TargetPlatform.iOS:
+          final options = await _plugin
+              .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin
+              >()
+              ?.checkPermissions();
+          return options?.isEnabled ?? false;
+        case TargetPlatform.macOS:
+          final options = await _plugin
+              .resolvePlatformSpecificImplementation<
+                MacOSFlutterLocalNotificationsPlugin
+              >()
+              ?.checkPermissions();
+          return options?.isEnabled ?? false;
+        default:
+          return true;
+      }
+    } catch (error) {
+      debugPrint('Notification permission check failed: $error');
+      return false;
+    }
+  }
+
   Future<void> schedule(RoutineItem item, {DateTime? now}) async {
     if (!item.notificationsEnabled || item.isCompleted) {
       await cancel(item.id);
@@ -238,6 +278,12 @@ class ReminderNotificationService {
     final id = notificationIdFor(item.id);
     if (_usesNativeAndroidAlarms &&
         await _scheduleNativeAndroidAlarm(item, schedule)) {
+      return;
+    }
+
+    if (_usesPluginBatch(item)) {
+      await _cancelPluginBatch(item);
+      await _schedulePluginBatch(item, now: now);
       return;
     }
 
@@ -274,6 +320,67 @@ class ReminderNotificationService {
       } catch (fallbackError) {
         debugPrint('Reminder scheduling failed: $fallbackError');
       }
+    }
+  }
+
+  /// Whether the daily recurrence fires on every day of the week. Partial
+  /// day-of-week selections cannot be represented as a single repeating
+  /// notification, so they are scheduled as a rolling one-shot batch.
+  bool _usesPluginBatch(RoutineItem item) =>
+      item.recurrenceRule == 'daily' && !_isEveryDay(item);
+
+  Future<void> _schedulePluginBatch(RoutineItem item, {DateTime? now}) async {
+    await initialize();
+    if (!_initialized || kIsWeb) return;
+    final start = DateTime.tryParse(item.scheduledDate ?? '');
+    final time = _parseTime(item.scheduledTime);
+    if (start == null || time == null) return;
+
+    var occurrence = _nextOccurrence(
+      item,
+      from: now ?? DateTime.now(),
+      start: start,
+      time: time,
+    );
+    var scheduled = 0;
+    while (occurrence != null && scheduled < _pluginBatchCount) {
+      final trigger = occurrence.subtract(
+        Duration(minutes: item.prepOffsetMinutes ?? 0),
+      );
+      try {
+        await _plugin.zonedSchedule(
+          id: occurrenceNotificationIdFor(item.id, _dateKey(occurrence)),
+          title: item.title,
+          body: _notificationBody(item),
+          scheduledDate: tz.TZDateTime.from(trigger, tz.local),
+          notificationDetails: _notificationDetails(),
+          payload: item.id,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+      } catch (error) {
+        debugPrint('Batch reminder scheduling failed: $error');
+      }
+      occurrence = _nextOccurrence(
+        item,
+        from: occurrence,
+        start: start,
+        time: time,
+      );
+      scheduled += 1;
+    }
+  }
+
+  Future<void> _cancelPluginBatch(RoutineItem item) =>
+      _cancelPluginBatchById(item.id);
+
+  Future<void> _cancelPluginBatchById(String itemId) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    for (var offset = 0; offset <= _pluginBatchCancelDays; offset++) {
+      final day = start.add(Duration(days: offset));
+      await _cancelNotificationId(
+        occurrenceNotificationIdFor(itemId, _dateKey(day)),
+      );
     }
   }
 
@@ -319,6 +426,7 @@ class ReminderNotificationService {
       'body': _notificationBody(item),
       'triggerAtMillis': triggerAt.millisecondsSinceEpoch,
       'recurrence': recurrence,
+      'repeatDays': item.repeatDays ?? const <int>[],
     };
   }
 
@@ -368,6 +476,7 @@ class ReminderNotificationService {
     }
     await _cancelNotificationId(notificationIdFor(itemId));
     await _cancelNotificationId(snoozeNotificationIdFor(itemId));
+    if (!_usesNativeAndroidAlarms) await _cancelPluginBatchById(itemId);
   }
 
   Future<void> stopAlarm(String itemId) async {
@@ -407,28 +516,30 @@ class ReminderNotificationService {
     if (date == null || time == null) return null;
 
     final current = now ?? DateTime.now();
-    var scheduled = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.$1,
-      time.$2,
-    ).subtract(Duration(minutes: item.prepOffsetMinutes ?? 0));
+    final occurrence = _nextOccurrence(
+      item,
+      from: current,
+      start: date,
+      time: time,
+    );
+    if (occurrence == null) return null;
+
+    final scheduled = occurrence.subtract(
+      Duration(minutes: item.prepOffsetMinutes ?? 0),
+    );
 
     DateTimeComponents? components;
     switch (item.recurrenceRule) {
       case 'daily':
-        while (!scheduled.isAfter(current)) {
-          scheduled = scheduled.add(const Duration(days: 1));
-        }
-        components = DateTimeComponents.time;
+        // A repeating day-of-time schedule only works when every day fires.
+        // A partial selection is scheduled as one-shot batch by schedule().
+        if (_isEveryDay(item)) components = DateTimeComponents.time;
       case 'weekly':
-        while (!scheduled.isAfter(current)) {
-          scheduled = scheduled.add(const Duration(days: 7));
-        }
         components = DateTimeComponents.dayOfWeekAndTime;
+      case 'monthly':
+        components = DateTimeComponents.dayOfMonthAndTime;
       default:
-        if (!scheduled.isAfter(current)) return null;
+        components = null;
     }
 
     return ReminderSchedule(
@@ -437,8 +548,114 @@ class ReminderNotificationService {
     );
   }
 
+  /// Next scheduled occurrence (ignoring the preparation offset) strictly
+  /// after [from], or null for a one-time item that is already in the past.
+  static DateTime? _nextOccurrence(
+    RoutineItem item, {
+    required DateTime from,
+    required DateTime start,
+    required (int, int) time,
+  }) {
+    final current = DateTime(
+      from.year,
+      from.month,
+      from.day,
+      from.hour,
+      from.minute,
+      from.second,
+    );
+    final first = DateTime(start.year, start.month, start.day);
+
+    switch (item.recurrenceRule) {
+      case 'daily':
+        final startDay = current.subtract(const Duration(days: 1));
+        var day = startDay.isBefore(first) ? first : startDay;
+        while (true) {
+          if (_repeatsOnWeekday(item, day.weekday)) {
+            final candidate = DateTime(
+              day.year,
+              day.month,
+              day.day,
+              time.$1,
+              time.$2,
+            );
+            if (candidate.isAfter(current)) return candidate;
+          }
+          day = day.add(const Duration(days: 1));
+        }
+      case 'weekly':
+        final difference = current.difference(first).inDays;
+        final anchored = (difference >= 0 ? difference : -1) ~/ 7 * 7;
+        var candidate = DateTime(
+          first.year,
+          first.month,
+          first.day + anchored,
+          time.$1,
+          time.$2,
+        );
+        while (!candidate.isAfter(current)) {
+          candidate = candidate.add(const Duration(days: 7));
+        }
+        return candidate;
+      case 'monthly':
+        var year = first.year;
+        var month = first.month;
+        while (true) {
+          final day = DateTime(year, month, first.day);
+          if (day.day == first.day) {
+            final candidate = DateTime(
+              year,
+              month,
+              first.day,
+              time.$1,
+              time.$2,
+            );
+            if (candidate.isAfter(current)) return candidate;
+          }
+          month += 1;
+          if (month > 12) {
+            month = 1;
+            year += 1;
+          }
+        }
+      default:
+        final candidate = DateTime(
+          first.year,
+          first.month,
+          first.day,
+          time.$1,
+          time.$2,
+        );
+        return candidate.isAfter(current) ? candidate : null;
+    }
+  }
+
+  static bool _repeatsOnWeekday(RoutineItem item, int weekday) {
+    final days = item.repeatDays;
+    if (days == null || days.isEmpty) return true;
+    return days.contains(weekday);
+  }
+
+  static bool _isEveryDay(RoutineItem item) {
+    final days = item.repeatDays;
+    return days == null || days.isEmpty || days.length >= 7;
+  }
+
+  /// Number of one-shot occurrences scheduled ahead for a partial day-of-week
+  /// daily repeat on platforms without native recurring alarms.
+  static const int _pluginBatchCount = 30;
+
+  /// Look-back window used when cancelling a batch; 30 occurrences with a
+  /// maximum 7-day gap fit comfortably inside it.
+  static const int _pluginBatchCancelDays = 365;
+
   static int notificationIdFor(String itemId) {
     return _hashNotificationId(itemId);
+  }
+
+  /// Stable per-occurrence ID for one-shot batch notifications.
+  static int occurrenceNotificationIdFor(String itemId, String dateKey) {
+    return _hashNotificationId('$itemId:occ:$dateKey');
   }
 
   /// Keeps a snooze independent from a daily/weekly notification. Reusing the
@@ -548,14 +765,7 @@ class ReminderNotificationService {
     Duration? closestDistance;
     for (var offset = -8; offset <= 8; offset++) {
       final day = DateTime(current.year, current.month, current.day + offset);
-      final difference = day
-          .difference(DateTime(start.year, start.month, start.day))
-          .inDays;
-      if (difference < 0) continue;
-      final occurs =
-          item.recurrenceRule == 'daily' ||
-          (item.recurrenceRule == 'weekly' && difference % 7 == 0);
-      if (!occurs) continue;
+      if (!item.occursOnDate(day)) continue;
 
       final occurrence = DateTime(
         day.year,

@@ -10,7 +10,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  test('database v3 migrates to v5 occurrence storage', () async {
+  test('database v3 migrates to v6 occurrence storage', () async {
     final name = 'migration_${DateTime.now().microsecondsSinceEpoch}.db';
     final databasePath = path.join(await getDatabasesPath(), name);
     await deleteDatabase(databasePath);
@@ -28,15 +28,22 @@ void main() {
     final tables = await upgraded.rawQuery(
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
+    final columns = await upgraded.rawQuery('PRAGMA table_info(items)');
+    final names = columns
+        .map((column) => column['name']?.toString())
+        .whereType<String>()
+        .toSet();
 
-    expect(await upgraded.getVersion(), 5);
+    expect(await upgraded.getVersion(), 6);
     expect(tables.map((entry) => entry['name']), contains('item_occurrences'));
+    expect(names, contains('repeat_days_json'));
     await helper.close();
     await deleteDatabase(databasePath);
   });
 
   test('database v4 removes legacy numeric columns', () async {
-    final name = 'measurement_migration_${DateTime.now().microsecondsSinceEpoch}.db';
+    final name =
+        'measurement_migration_${DateTime.now().microsecondsSinceEpoch}.db';
     final databasePath = path.join(await getDatabasesPath(), name);
     await deleteDatabase(databasePath);
     final oldDatabase = await openDatabase(
@@ -64,10 +71,11 @@ void main() {
         .whereType<String>()
         .toSet();
 
-    expect(await upgraded.getVersion(), 5);
+    expect(await upgraded.getVersion(), 6);
     expect(names, contains('id'));
     expect(names, isNot(contains('numeric_value')));
     expect(names, isNot(contains('unit')));
+    expect(names, contains('repeat_days_json'));
     expect((await upgraded.query('items')).single['item_type'], 'log');
     await helper.close();
     await deleteDatabase(databasePath);

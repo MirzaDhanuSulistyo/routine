@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 5,
+      version: 6,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -55,6 +55,7 @@ CREATE TABLE items (
   is_completed INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
   prep_offset_minutes INTEGER,
+  repeat_days_json TEXT,
   topic_sources_json TEXT,
   brief_stories_json TEXT
 )
@@ -125,6 +126,9 @@ CREATE TABLE IF NOT EXISTS item_occurrences (
       if (names.contains('unit')) {
         await db.execute('ALTER TABLE items DROP COLUMN unit');
       }
+    }
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE items ADD COLUMN repeat_days_json TEXT');
     }
   }
 

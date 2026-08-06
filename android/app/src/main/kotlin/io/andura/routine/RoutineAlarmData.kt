@@ -12,6 +12,7 @@ data class RoutineAlarmData(
     val body: String,
     val triggerAtMillis: Long,
     val recurrence: String,
+    val repeatDays: List<Int> = emptyList(),
 ) {
     fun putInto(intent: Intent): Intent = intent.apply {
         putExtra(RoutineAlarmContract.EXTRA_NOTIFICATION_ID, notificationId)
@@ -21,6 +22,7 @@ data class RoutineAlarmData(
         putExtra(RoutineAlarmContract.EXTRA_BODY, body)
         putExtra(RoutineAlarmContract.EXTRA_TRIGGER_AT, triggerAtMillis)
         putExtra(RoutineAlarmContract.EXTRA_RECURRENCE, recurrence)
+        putExtra(RoutineAlarmContract.EXTRA_REPEAT_DAYS, repeatDays.toIntArray())
     }
 
     fun toMap(): Map<String, Any> = mapOf(
@@ -31,6 +33,7 @@ data class RoutineAlarmData(
         "body" to body,
         "triggerAtMillis" to triggerAtMillis,
         "recurrence" to recurrence,
+        "repeatDays" to repeatDays,
     )
 
     fun toJson(): String = JSONObject().apply {
@@ -41,6 +44,7 @@ data class RoutineAlarmData(
         put("body", body)
         put("triggerAtMillis", triggerAtMillis)
         put("recurrence", recurrence)
+        put("repeatDays", repeatDays)
     }.toString()
 
     companion object {
@@ -66,6 +70,8 @@ data class RoutineAlarmData(
                 ),
                 recurrence = intent.getStringExtra(RoutineAlarmContract.EXTRA_RECURRENCE)
                     ?: "none",
+                repeatDays = intent.getIntArrayExtra(RoutineAlarmContract.EXTRA_REPEAT_DAYS)
+                    ?.toList() ?: emptyList(),
             )
         }
 
@@ -74,6 +80,9 @@ data class RoutineAlarmData(
                 ?: throw IllegalArgumentException("Missing alarm argument: $key")
             fun text(key: String): String = arguments[key] as? String
                 ?: throw IllegalArgumentException("Missing alarm argument: $key")
+
+            val rawRepeatDays = arguments["repeatDays"] as? List<*>
+            val repeatDays = rawRepeatDays.orEmpty().mapNotNull { (it as? Number)?.toInt() }
 
             return RoutineAlarmData(
                 notificationId = number("notificationId").toInt().coerceAtLeast(1),
@@ -84,11 +93,19 @@ data class RoutineAlarmData(
                 body = (arguments["body"] as? String).orEmpty(),
                 triggerAtMillis = number("triggerAtMillis").toLong(),
                 recurrence = (arguments["recurrence"] as? String) ?: "none",
+                repeatDays = repeatDays,
             )
         }
 
         fun fromJson(value: String): RoutineAlarmData? = try {
             val json = JSONObject(value)
+            val repeatDays = if (json.has("repeatDays")) {
+                json.getJSONArray("repeatDays").let { array ->
+                    (0 until array.length()).map { array.getInt(it) }
+                }
+            } else {
+                emptyList()
+            }
             RoutineAlarmData(
                 notificationId = json.getInt("notificationId").coerceAtLeast(1),
                 snoozeNotificationId = json.getInt("snoozeNotificationId")
@@ -98,6 +115,7 @@ data class RoutineAlarmData(
                 body = json.optString("body", ""),
                 triggerAtMillis = json.getLong("triggerAtMillis"),
                 recurrence = json.optString("recurrence", "none"),
+                repeatDays = repeatDays,
             )
         } catch (_: Exception) {
             null
@@ -121,6 +139,7 @@ object RoutineAlarmContract {
     const val EXTRA_BODY = "routine_alarm_body"
     const val EXTRA_TRIGGER_AT = "routine_alarm_trigger_at"
     const val EXTRA_RECURRENCE = "routine_alarm_recurrence"
+    const val EXTRA_REPEAT_DAYS = "routine_alarm_repeat_days"
     const val EXTRA_EVENT = "routine_alarm_event"
 
     const val EVENT_TRIGGERED = "triggered"

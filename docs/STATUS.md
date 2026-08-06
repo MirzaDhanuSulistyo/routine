@@ -21,7 +21,9 @@
 - Item completion persistence
 - Per-occurrence completion history keyed by recurring item and date
 - Completion event/recorded timestamps for recurring occurrences
-- Daily and weekly recurring timeline projection
+- Daily, weekly, and monthly recurring timeline projection
+- Daily repeats with per-day-of-week selection (Sunday through Saturday)
+- Monthly repeats anchored to the scheduled day of the month
 - Item editing and confirmed deletion with cascading history cleanup
 - Reminder cancellation and rescheduling after item mutations
 - Timezone-aware Android/iOS reminder scheduling

@@ -142,6 +142,87 @@ void main() {
     },
   );
 
+  test('daily repeat days and monthly recurrence project correctly', () async {
+    final suffix = DateTime.now().microsecondsSinceEpoch;
+    final helper = DatabaseHelper.withName('test_recurrence_$suffix.db');
+    final repository = RoutineRepository(dbHelper: helper);
+
+    // 2026-07-20 is a Monday; repeat on Mon(1), Wed(3), Fri(5).
+    final weekdayOnly = RoutineItem(
+      id: 'weekday_only',
+      title: 'Weekday practice',
+      itemType: 'task',
+      category: 'family',
+      timeOfDay: 'evening',
+      scheduledTime: '07:00 PM',
+      scheduledDate: '2026-07-20',
+      recurrenceRule: 'daily',
+      repeatDays: [1, 3, 5],
+    );
+    final billPay = RoutineItem(
+      id: 'bill_pay',
+      title: 'Pay bills',
+      itemType: 'reminder',
+      category: 'finance',
+      timeOfDay: 'morning',
+      scheduledTime: '09:00 AM',
+      scheduledDate: '2026-07-20',
+      recurrenceRule: 'monthly',
+    );
+    await repository.insertItem(weekdayOnly);
+    await repository.insertItem(billPay);
+
+    final persisted = await repository.getItemById('weekday_only');
+    expect(persisted!.repeatDays, [1, 3, 5]);
+
+    // Mon 2026-07-20, Tue 2026-07-21, Wed 2026-07-22, Fri 2026-07-24.
+    expect(
+      (await repository.getItemsForDate(
+        DateTime(2026, 7, 20),
+      )).any((i) => i.id == 'weekday_only'),
+      isTrue,
+    );
+    expect(
+      (await repository.getItemsForDate(
+        DateTime(2026, 7, 21),
+      )).any((i) => i.id == 'weekday_only'),
+      isFalse,
+    );
+    expect(
+      (await repository.getItemsForDate(
+        DateTime(2026, 7, 22),
+      )).any((i) => i.id == 'weekday_only'),
+      isTrue,
+    );
+    expect(
+      (await repository.getItemsForDate(
+        DateTime(2026, 7, 24),
+      )).any((i) => i.id == 'weekday_only'),
+      isTrue,
+    );
+
+    expect(
+      (await repository.getItemsForDate(
+        DateTime(2026, 7, 20),
+      )).any((i) => i.id == 'bill_pay'),
+      isTrue,
+    );
+    expect(
+      (await repository.getItemsForDate(
+        DateTime(2026, 8, 20),
+      )).any((i) => i.id == 'bill_pay'),
+      isTrue,
+    );
+    expect(
+      (await repository.getItemsForDate(
+        DateTime(2026, 8, 21),
+      )).any((i) => i.id == 'bill_pay'),
+      isFalse,
+    );
+
+    await helper.close();
+  });
+
   test('named databases are isolated and restore replaces user data', () async {
     final suffix = DateTime.now().microsecondsSinceEpoch;
     final firstHelper = DatabaseHelper.withName('test_first_$suffix.db');
