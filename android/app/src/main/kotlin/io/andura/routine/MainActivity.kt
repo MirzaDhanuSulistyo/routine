@@ -1,5 +1,6 @@
 package io.andura.routine
 
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -152,6 +153,16 @@ class MainActivity : FlutterActivity() {
             "isAlarmActive" -> {
                 val itemId = arguments.text("itemId")
                 result.success(RoutineAlarmStore.active(this)?.itemId == itemId)
+            }
+            "hasFullScreenPermission" -> {
+                val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val manager =
+                        getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    manager.canUseFullScreenIntent()
+                } else {
+                    true
+                }
+                result.success(granted)
             }
             else -> result.notImplemented()
         }

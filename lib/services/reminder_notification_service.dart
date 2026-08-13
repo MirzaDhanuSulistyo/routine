@@ -172,7 +172,31 @@ class ReminderNotificationService {
   bool get _usesNativeAndroidAlarms =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
+  /// Requests every permission backing reminders, including the Android 14+
+  /// full-screen-intent special access. Used by the explicit Settings action.
   Future<bool> requestPermissions() async {
+    final core = await requestCorePermissions();
+    if (!core || kIsWeb) return core;
+    try {
+      if (_usesNativeAndroidAlarms) {
+        await _plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()
+            ?.requestFullScreenIntentPermission();
+      }
+    } catch (error) {
+      debugPrint('Full-screen intent permission request failed: $error');
+    }
+    return core && await hasFullScreenPermission();
+  }
+
+  /// Requests the permissions that are essential for an alarm to ring:
+  /// notification display and exact scheduling. The full-screen-intent grant
+  /// is deliberately not gated here: on Android 14+ it lives behind a separate
+  /// system settings page, the alarm service rings and vibrates without it,
+  /// and backing out of that page must not silently disable the reminder.
+  Future<bool> requestCorePermissions() async {
     await initialize();
     if (kIsWeb) return false;
 
@@ -187,9 +211,7 @@ class ReminderNotificationService {
               await android?.requestNotificationsPermission() ?? true;
           final exactAlarms =
               await android?.requestExactAlarmsPermission() ?? true;
-          final fullScreen =
-              await android?.requestFullScreenIntentPermission() ?? true;
-          return notifications && exactAlarms && fullScreen;
+          return notifications && exactAlarms;
         case TargetPlatform.iOS:
           return await _plugin
                   .resolvePlatformSpecificImplementation<
@@ -229,7 +251,9 @@ class ReminderNotificationService {
               await android?.areNotificationsEnabled() ?? false;
           final exactAlarms =
               await android?.canScheduleExactNotifications() ?? false;
-          return notifications && exactAlarms;
+          return notifications &&
+              exactAlarms &&
+              await hasFullScreenPermission();
         case TargetPlatform.iOS:
           final options = await _plugin
               .resolvePlatformSpecificImplementation<
@@ -250,6 +274,20 @@ class ReminderNotificationService {
     } catch (error) {
       debugPrint('Notification permission check failed: $error');
       return false;
+    }
+  }
+
+  /// Whether Android can launch the alarm UI over the lock screen. Always true
+  /// on platforms without full-screen alarms (iOS shows banners instead).
+  Future<bool> hasFullScreenPermission() async {
+    if (!_usesNativeAndroidAlarms) return true;
+    try {
+      return await _nativeAlarmChannel.invokeMethod<bool>(
+            'hasFullScreenPermission',
+          ) ??
+          true;
+    } catch (_) {
+      return true;
     }
   }
 
@@ -498,10 +536,12 @@ class ReminderNotificationService {
     if (!_initialized || kIsWeb) return 0;
     try {
       if (_usesNativeAndroidAlarms) {
-        return await _nativeAlarmChannel.invokeMethod<int>(
+        final native = await _nativeAlarmChannel.invokeMethod<int>(
               'pendingAlarmCount',
             ) ??
             0;
+        final plugin = (await _plugin.pendingNotificationRequests()).length;
+        return native + plugin;
       }
       return (await _plugin.pendingNotificationRequests()).length;
     } catch (_) {

@@ -649,9 +649,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     onPressed: () async {
                       final title = titleController.text.trim();
                       if (title.isEmpty) return;
-                      var canNotify = notificationsEnabled;
-                      if (canNotify) {
-                        canNotify = await _reminders.requestPermissions();
+                      // Permissions gate only the warning, never the saved
+                      // intent: the native alarm rings through the foreground
+                      // service even when some grants are missing, and it is
+                      // armed now so it fires as soon as they are granted.
+                      var permissionsGranted = true;
+                      if (notificationsEnabled) {
+                        permissionsGranted =
+                            await _reminders.requestCorePermissions();
                       }
                       final newItem = RoutineItem(
                         id:
@@ -672,7 +677,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             recurrenceRule == 'daily' && repeatDays.length < 7
                             ? List<int>.from(repeatDays)
                             : null,
-                        notificationsEnabled: canNotify,
+                        notificationsEnabled: notificationsEnabled,
                         eventTimestamp: existingItem?.eventTimestamp,
                         recordedAtTimestamp: existingItem?.recordedAtTimestamp,
                         isCompleted: recurrenceRule == 'none'
@@ -709,11 +714,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         _selectedDate = date;
                       });
                       if (dialogContext.mounted) Navigator.pop(dialogContext);
-                      if (notificationsEnabled && !canNotify && mounted) {
+                      if (notificationsEnabled && !permissionsGranted && mounted) {
                         ScaffoldMessenger.of(this.context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Item created, but alarm permissions were not fully granted.',
+                              'Reminder saved, but alarm permissions were not '
+                              'fully granted. Open Settings and tap Enable '
+                              'Alarm Permissions for full-screen ringing.',
                             ),
                           ),
                         );
@@ -2061,7 +2068,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Version 1.1.0 • Zero Cloud Dependency • 100% On-Device Analytics',
+                  'Version 1.1.1 • Zero Cloud Dependency • 100% On-Device Analytics',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
