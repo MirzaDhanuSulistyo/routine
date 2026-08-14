@@ -2,6 +2,7 @@ package io.andura.routine
 
 import android.content.Context
 import android.content.Intent
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class RoutineAlarmData(
@@ -44,7 +45,7 @@ data class RoutineAlarmData(
         put("body", body)
         put("triggerAtMillis", triggerAtMillis)
         put("recurrence", recurrence)
-        put("repeatDays", repeatDays)
+        put("repeatDays", JSONArray(repeatDays))
     }.toString()
 
     companion object {
@@ -100,8 +101,14 @@ data class RoutineAlarmData(
         fun fromJson(value: String): RoutineAlarmData? = try {
             val json = JSONObject(value)
             val repeatDays = if (json.has("repeatDays")) {
-                json.getJSONArray("repeatDays").let { array ->
-                    (0 until array.length()).map { array.getInt(it) }
+                val raw = json.get("repeatDays")
+                when (raw) {
+                    is JSONArray -> (0 until raw.length()).map { raw.getInt(it) }
+                    is String -> raw
+                        .removeSurrounding("[", "]")
+                        .split(",")
+                        .mapNotNull { it.trim().toIntOrNull() }
+                    else -> emptyList()
                 }
             } else {
                 emptyList()
