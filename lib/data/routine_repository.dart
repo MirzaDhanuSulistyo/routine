@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../domain/routine_item.dart';
@@ -8,11 +9,21 @@ import 'database_helper.dart';
 
 class RoutineRepository {
   final DatabaseHelper dbHelper;
+  static final List<RoutineItem> _webItems = [];
+  static final Map<String, RoutineOccurrence> _webOccurrences = {};
 
   RoutineRepository({DatabaseHelper? dbHelper})
     : dbHelper = dbHelper ?? DatabaseHelper.instance;
 
   Future<List<RoutineItem>> getAllItems() async {
+    if (kIsWeb) {
+      if (_webItems.isEmpty) {
+        await resetToSeedItems();
+      }
+      final copy = List<RoutineItem>.from(_webItems);
+      copy.sort(_compareItems);
+      return copy;
+    }
     final db = await dbHelper.database;
     final maps = await db.query('items');
 
@@ -36,6 +47,21 @@ class RoutineRepository {
   Future<List<RoutineItem>> getItemsForDate(DateTime date) async {
     final items = await getAllItems();
     final dateKey = _dateKey(date);
+    if (kIsWeb) {
+      final completedIds = _webOccurrences.values
+          .where((entry) => entry.occurrenceDate == dateKey && entry.isCompleted)
+          .map((entry) => entry.itemId)
+          .toSet();
+
+      final projected = items.where((item) => _occursOnDate(item, date)).map((item) {
+        if (item.recurrenceRule == 'none') return item;
+        return item.copyWith(isCompleted: completedIds.contains(item.id));
+      }).toList()..sort(
+        (a, b) => _timeMinutes(a.scheduledTime).compareTo(_timeMinutes(b.scheduledTime)),
+      );
+      return projected;
+    }
+
     final db = await dbHelper.database;
     final occurrenceMaps = await db.query(
       'item_occurrences',
@@ -61,6 +87,10 @@ class RoutineRepository {
   }
 
   Future<void> seedDataIfEmpty() async {
+    if (kIsWeb) {
+      if (_webItems.isEmpty) await resetToSeedItems();
+      return;
+    }
     final db = await dbHelper.database;
     final count = Sqflite.firstIntValue(
       await db.rawQuery('SELECT COUNT(*) FROM items'),
@@ -69,6 +99,12 @@ class RoutineRepository {
   }
 
   Future<void> resetToSeedItems({DateTime? date}) async {
+    if (kIsWeb) {
+      _webItems.clear();
+      _webOccurrences.clear();
+      _webItems.addAll(getSeedItems(date: date));
+      return;
+    }
     final db = await dbHelper.database;
     final seeds = getSeedItems(date: date);
     await db.transaction((txn) async {
@@ -83,6 +119,15 @@ class RoutineRepository {
   }
 
   Future<void> insertItem(RoutineItem item) async {
+    if (kIsWeb) {
+      final index = _webItems.indexWhere((i) => i.id == item.id);
+      if (index >= 0) {
+        _webItems[index] = item;
+      } else {
+        _webItems.add(item);
+      }
+      return;
+    }
     final db = await dbHelper.database;
     final values = _routineItemToMap(item);
     await db.transaction((txn) async {
@@ -97,6 +142,12 @@ class RoutineRepository {
   }
 
   Future<RoutineItem?> getItemById(String id) async {
+    if (kIsWeb) {
+      for (final item in _webItems) {
+        if (item.id == id) return item;
+      }
+      return null;
+    }
     final db = await dbHelper.database;
     final maps = await db.query(
       'items',
@@ -108,6 +159,11 @@ class RoutineRepository {
   }
 
   Future<List<RoutineOccurrence>> getAllOccurrences() async {
+    if (kIsWeb) {
+      final list = _webOccurrences.values.toList();
+      list.sort((a, b) => a.occurrenceDate.compareTo(b.occurrenceDate));
+      return list;
+    }
     final db = await dbHelper.database;
     final maps = await db.query(
       'item_occurrences',
@@ -120,6 +176,9 @@ class RoutineRepository {
     String itemId,
     String occurrenceDate,
   ) async {
+    if (kIsWeb) {
+      return _webOccurrences['${itemId}_$occurrenceDate'];
+    }
     final db = await dbHelper.database;
     final maps = await db.query(
       'item_occurrences',
@@ -136,6 +195,22 @@ class RoutineRepository {
     required bool isCompleted,
     DateTime? eventTime,
   }) async {
+    if (kIsWeb) {
+      final key = '${itemId}_$occurrenceDate';
+      if (!isCompleted) {
+        _webOccurrences.remove(key);
+      } else {
+        final now = DateTime.now();
+        _webOccurrences[key] = RoutineOccurrence(
+          itemId: itemId,
+          occurrenceDate: occurrenceDate,
+          isCompleted: true,
+          eventTimestamp: (eventTime ?? now).toIso8601String(),
+          recordedAtTimestamp: now.toIso8601String(),
+        );
+      }
+      return;
+    }
     final db = await dbHelper.database;
     if (!isCompleted) {
       await db.delete(
@@ -157,6 +232,13 @@ class RoutineRepository {
   }
 
   Future<void> updateItemCompletion(String id, bool isCompleted) async {
+    if (kIsWeb) {
+      final index = _webItems.indexWhere((i) => i.id == id);
+      if (index >= 0) {
+        _webItems[index] = _webItems[index].copyWith(isCompleted: isCompleted);
+      }
+      return;
+    }
     final db = await dbHelper.database;
     await db.update(
       'items',
@@ -167,6 +249,11 @@ class RoutineRepository {
   }
 
   Future<void> deleteItem(String id) async {
+    if (kIsWeb) {
+      _webItems.removeWhere((i) => i.id == id);
+      _webOccurrences.removeWhere((k, v) => v.itemId == id);
+      return;
+    }
     final db = await dbHelper.database;
     await db.transaction((txn) async {
       await txn.delete(
