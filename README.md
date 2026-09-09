@@ -55,3 +55,7 @@ flutter test
 ## Production gaps
 
 The app remains a beta. Live briefing feeds, robust seven-day correlation analysis, data export, persisted preferences, and broader integration testing are still planned.
+
+## Part of Andura
+
+Routine is part of [Andura](https://github.com/MirzaDhanuSulistyo/Andura) — I release products from real problems. Product page: [andura.io/work/routine](https://andura.io/work/routine/).
